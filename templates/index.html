@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="lead">
+  Voltage-divider bias. Resistances are entered in kΩ, voltages in V.
+</p>
+
+<form method="post" action="{{ url_for('calculate') }}" class="bias-form">
+  {% for name, label, unit in fields %}
+  <div class="field">
+    <label for="{{ name }}">
+      {{ label }}{% if unit %} <span class="unit">({{ unit }})</span>{% endif %}
+    </label>
+    <input id="{{ name }}" name="{{ name }}" type="text" inputmode="decimal"
+           autocomplete="off" value="{{ values.get(name, '') }}">
+    {% if errors.get(name) %}
+    <p class="error">{{ errors[name] }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <button type="submit">Calculate</button>
+</form>
+{% endblock %}
