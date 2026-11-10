@@ -75,7 +75,7 @@ def solve_saturation(p: BiasParams) -> BiasResult:
 def solve(p: BiasParams) -> BiasResult:
     """Classify the operating point and return the matching solution."""
     if p.vbb <= p.vbe:
-        return BiasResult(Region.CUTOFF, 0.0, 0.0, 0.0, p.vbe,
+        return BiasResult(Region.CUTOFF, 0.0, 0.0, 0.0, p.vbb,
                           p.vcc, p.vbb, p.vcc, 0.0)
 
     active = solve_exact(p)

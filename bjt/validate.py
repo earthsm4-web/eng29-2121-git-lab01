@@ -1,5 +1,6 @@
 """Parse submitted form strings into validated SI-unit parameters."""
 
+import math
 from collections.abc import Mapping
 
 from .params import BiasParams
@@ -31,9 +32,14 @@ def parse_form(
             errors[field] = f"{name} is required"
             continue
         try:
-            values[field] = float(raw)
+            value = float(raw)
         except ValueError:
             errors[field] = f"{name} must be a number"
+            continue
+        if not math.isfinite(value):
+            errors[field] = f"{name} must be a number"
+            continue
+        values[field] = value
 
     if "vcc" in values and values["vcc"] <= 0:
         errors["vcc"] = "VCC must be greater than 0"
