@@ -80,3 +80,10 @@ def test_all_errors_are_reported_together():
                                  "rc": "0", "re": "0", "beta": "0", "vbe": "0"})
     assert params is None
     assert set(errors) == {"vcc", "r1", "r2", "rc", "re", "beta", "vbe"}
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "1e309"])
+def test_non_finite_value_is_not_a_number(raw):
+    params, errors = parse_form(dict(GOOD, rc=raw))
+    assert params is None
+    assert errors["rc"] == "RC must be a number"

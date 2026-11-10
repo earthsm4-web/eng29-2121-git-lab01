@@ -38,6 +38,7 @@ def test_cutoff_when_divider_cannot_forward_bias_junction():
     assert r.vce == pytest.approx(12.0)
     assert r.vc == pytest.approx(12.0)
     assert r.vb == pytest.approx(p.vbb)
+    assert r.vbe == pytest.approx(p.vbb)
 
 
 def test_saturation_when_collector_resistor_too_large():
