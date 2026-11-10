@@ -620,6 +620,51 @@ If no remote URL or commit identity is available, stop before the push and ask �
 
 ---
 
+## Task 6: Circuit schematic and calculation walk-through
+
+**Files:**
+- Create: `bjt/steps.py`, `templates/_schematic.html`, `templates/_steps.html`, `tests/test_steps.py`
+- Modify: `bjt/format.py`, `app.py`, `templates/result.html`, `static/style.css`, `tests/test_routes.py`
+
+**Interfaces:**
+- Consumes: `BiasParams`, `BiasResult`, `Region`, `fmt_v`, `fmt_i`.
+- Produces: `@dataclass(frozen=True) class Step` with `quantity: str, formula: str, substitution: str, result: str`; `steps_for(p: BiasParams, result: BiasResult) -> list[Step]`; `fmt_r(x: float) -> str`; `fmt_num(x: float) -> str`; Jinja filters `r` and `num`.
+
+Golden strings for `LAB = BiasParams(vcc=12, r1=47k, r2=10k, rc=4.7k, re=1k, beta=100, vbe=0.7)`:
+
+| # | quantity | result |
+|---|---|---|
+| 1 | VBB | `2.1053 V` |
+| 2 | RB | `8.2456 kΩ` |
+| 3 | IB | `12.863 µA` |
+| 4 | IC | `1.2863 mA` |
+| 5 | IE | `1.2992 mA` |
+| 6 | VE | `1.2992 V` |
+| 7 | VB | `1.9992 V` |
+| 8 | VC | `5.9542 V` |
+| 9 | VCE | `4.6550 V` |
+
+- [ ] **Step 1: Write the failing tests**
+
+`tests/test_steps.py` must assert: nine Active steps in that order with those
+`result` strings; `substitution` for step 1 equals `12 · 10 / (47 + 10)` and
+for step 3 equals `(2.1053 − 0.7) / (8.2456 + 101 · 1)`; four Saturation steps
+for `rc=10k` starting with `1.0718 mA`; two Cutoff steps for `r1=100k, r2=1k`
+ending with `0.000 µA`; `fmt_r(47_000) == "47 kΩ"`, `fmt_r(4_700) == "4.7 kΩ"`,
+`fmt_r(8245.614035) == "8.2456 kΩ"`; `fmt_num(12.0) == "12"`.
+
+Append to `tests/test_routes.py`: the Active page contains `class="schematic"`,
+`R1 47 kΩ`, `RB = R1 ∥ R2`, and `4.6550 V`; the Cutoff page contains the
+walk-through heading and `IB = 0`, and still no `Approximate`.
+
+- [ ] **Step 2: Run to watch them fail** — `.\.venv\Scripts\python -m pytest -q` → `ModuleNotFoundError: bjt.steps`.
+
+- [ ] **Step 3: Implement** `fmt_r`/`fmt_num` in `bjt/format.py`; `bjt/steps.py` building each row from `BiasParams` and the already-computed `BiasResult` (never re-solving); `steps_for` dispatching on `result.region`; register the `r` and `num` filters in `app.py` and pass `params` and `steps` to the result template; add the two SVG/table partials and include them in `result.html`; add styles.
+
+- [ ] **Step 4: Run the full suite** — expected 39 existing + new tests, all passing.
+
+- [ ] **Step 5: Commit** — `git add ... && git commit -m "feat: circuit schematic and calculation walk-through on the result page"`.
+
 ## Self-Review
 
 **1. Spec coverage.** Form and defaults → Task 4. Exact equations → Task 2. Approximate equations and comparison → Task 3. Stiffness rule → Task 1 (`is_stiff`) and Task 3 (surfaced). Region logic and `VCE_SAT` → Task 2. Validation → Task 1. Units/formatting → Task 4. Separate logic/templates/CSS/tests → Tasks 1–5. Localhost demo → Task 5. GitHub commit → Tasks 1–5 commit each task, push in Task 5.

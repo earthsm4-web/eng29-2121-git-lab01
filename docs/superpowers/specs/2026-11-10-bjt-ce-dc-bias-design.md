@@ -155,6 +155,30 @@ Exact visual styling, wording of the warning sentences, number of decimal
 places beyond 3, and whether the comparison table also shows `%diff` as a
 bar. All are cosmetic and settle without changing what gets built.
 
+## Addendum — calculation illustrations (approved 2026-11-10)
+
+Adds two illustrations to the **result page only**. Both read the same
+`BiasResult` the numbers come from, so the picture can never disagree with
+the table.
+
+**A. Circuit schematic.** A hand-written inline SVG partial
+(`templates/_schematic.html`): supply rail, R1/R2 divider, RC, RE, the
+transistor symbol, computed node voltages (VB, VC, VE), and a Q-point box
+(IC, VCE). No JavaScript and no new dependency. Resistor labels are in kΩ.
+
+**B. Calculation walk-through.** A table rendered from data computed in
+Python (`bjt/steps.py`), never in Jinja. Each row is
+`Step(quantity, formula, substitution, result)`. Row sets depend on region:
+
+| Region | Rows |
+|---|---|
+| Active | 9 — VBB, RB, IB, IC, IE, VE, VB, VC, VCE |
+| Saturation | 4 — IC, IB, IE, VE |
+| Cutoff | 2 — VBB, then IB = 0 because VBB ≤ VBE |
+
+`fmt_r` (Ω → kΩ) and `fmt_num` (%g-style, trailing zeros trimmed) join the
+display helpers.
+
 ## Delivery notes (not part of the app design)
 
 Blockers found during recon, to be handled in Task 0 of the plan:
