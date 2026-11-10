@@ -73,3 +73,21 @@ def test_cutoff_page_still_shows_the_walkthrough(client):
     assert "How this was calculated" in html
     assert "IB = 0" in html
     assert "Approximate" not in html
+
+
+def test_schematic_follows_the_computed_point(client):
+    html = client.post("/calculate", data=dict(GOOD, rc="2")).get_data(as_text=True)
+    assert "VC 9.4273 V" in html
+    assert "VCE 8.1281 V" in html
+
+
+def test_schematic_reports_the_saturation_qpoint(client):
+    html = client.post("/calculate", data=dict(GOOD, rc="10")).get_data(as_text=True)
+    assert "VCE 0.2000 V" in html
+    assert "IC 1.0718 mA" in html
+
+
+def test_schematic_reports_the_cutoff_qpoint(client):
+    html = client.post("/calculate", data=dict(GOOD, r1="100", r2="1")).get_data(as_text=True)
+    assert "IC 0.000 µA" in html
+    assert "VCE 12.0000 V" in html
