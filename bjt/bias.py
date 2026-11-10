@@ -49,13 +49,6 @@ class BiasResult:
         return self.region is not Region.SATURATION
 
 
-@dataclass(frozen=True)
-class Comparison:
-    approx: BiasResult
-    diffs: dict[str, float]
-    stiff: bool
-
-
 def solve_exact(p: BiasParams) -> BiasResult:
     """Solve the active region with base current reflected into the emitter."""
     ib = (p.vbb - p.vbe) / (p.rbb + (p.beta + 1.0) * p.re)
@@ -89,6 +82,13 @@ def solve(p: BiasParams) -> BiasResult:
     if active.vce < VCE_SAT:
         return solve_saturation(p)
     return active
+
+
+@dataclass(frozen=True)
+class Comparison:
+    approx: BiasResult
+    diffs: dict[str, float]
+    stiff: bool
 
 
 def solve_approximate(p: BiasParams) -> BiasResult:

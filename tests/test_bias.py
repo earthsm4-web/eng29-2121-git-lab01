@@ -1,6 +1,6 @@
 import pytest
 
-from bjt.bias import VCE_SAT, Region, solve, solve_exact, solve_saturation
+from bjt.bias import VCE_SAT, Region, compare, solve, solve_approximate, solve_exact, solve_saturation
 from bjt.params import BiasParams
 
 LAB = BiasParams(vcc=12.0, r1=47_000.0, r2=10_000.0, rc=4_700.0,
@@ -85,3 +85,35 @@ def test_solve_saturation_is_consistent_with_kvl():
     assert r.ic * p.rc + r.vce + r.ie * p.re == pytest.approx(p.vcc, rel=1e-9)
     assert r.ib * p.beta == pytest.approx(r.ic, rel=1e-9)
     assert r.vb - r.ve == pytest.approx(p.vbe, rel=1e-9)
+
+def test_approximate_solver_matches_hand_calculation():
+    a = solve_approximate(LAB)
+    assert a.ie == pytest.approx(1.405263e-3, rel=1e-5)
+    assert a.ic == pytest.approx(1.405263e-3, rel=1e-5)
+    assert a.ib == pytest.approx(1.405263e-5, rel=1e-5)
+    assert a.vb == pytest.approx(2.105263, rel=1e-5)
+    assert a.vc == pytest.approx(5.395263, rel=1e-5)
+    assert a.vce == pytest.approx(3.990000, rel=1e-5)
+
+
+def test_comparison_reports_signed_percent_differences():
+    c = compare(LAB)
+    assert c.stiff is True
+    assert set(c.diffs) == {"ic", "ie", "vce", "vb"}
+    assert c.diffs["ic"] == pytest.approx(9.2456, rel=1e-3)
+    assert c.diffs["ie"] == pytest.approx(8.1637, rel=1e-3)
+    assert c.diffs["vce"] == pytest.approx(-14.2859, rel=1e-3)
+    assert c.diffs["vb"] == pytest.approx(5.3053, rel=1e-3)
+
+
+def test_non_stiff_divider_is_flagged():
+    p = BiasParams(vcc=12.0, r1=47_000.0, r2=10_000.0, rc=4_700.0,
+                   re=1_000.0, beta=20.0, vbe=0.7)
+    assert compare(p).stiff is False
+
+
+def test_comparison_stiffness_boundary_is_inclusive():
+    p = BiasParams(vcc=12.0, r1=47_000.0, r2=10_000.0, rc=4_700.0,
+                   re=1_000.0, beta=100.0, vbe=0.7)
+    assert p.beta * p.re == 10 * p.r2
+    assert compare(p).stiff is True
