@@ -73,11 +73,21 @@ py -3.12 -m venv .venv
 
 Then open <http://127.0.0.1:5000/>.
 
+With auto-reload instead of the plain server:
+
+```powershell
+.\.venv\Scripts\python -m flask --app app run --debug
+```
+
 ## Test it
 
 ```powershell
 .\.venv\Scripts\python -m pytest
 ```
+
+`pytest` is listed in `requirements.txt`, so the install step above is enough.
+The suite uses pytest fixtures and `pytest.mark.parametrize`, so
+`python -m unittest discover -s tests` cannot collect it — use `pytest`.
 
 ## Layout
 
