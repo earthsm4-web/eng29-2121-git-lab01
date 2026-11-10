@@ -13,13 +13,13 @@ DEFAULTS = {
 }
 
 FIELDS = [
-    ("vcc", "VCC", "V"),
-    ("r1", "R1", "kΩ"),
-    ("r2", "R2", "kΩ"),
-    ("rc", "RC", "kΩ"),
-    ("re", "RE", "kΩ"),
-    ("beta", "Beta", ""),
-    ("vbe", "VBE", "V"),
+    ("vcc", "VCC", "V", "Supply Voltage"),
+    ("r1", "R1", "kΩ", "Upper Divider"),
+    ("r2", "R2", "kΩ", "Lower Divider"),
+    ("rc", "RC", "kΩ", "Collector Resistor"),
+    ("re", "RE", "kΩ", "Emitter Resistor"),
+    ("beta", "Beta", "–", "Current Gain"),
+    ("vbe", "VBE", "V", "Base-Emitter Voltage"),
 ]
 
 QUANTITIES = [
@@ -41,6 +41,28 @@ COMPARE_KEYS = [
 ]
 
 
+def _dashboard(values, errors=None, params=None) -> str:
+    """Render the single-page dashboard, solving only when params are valid."""
+    result = steps = comparison = None
+    if params is not None:
+        result = solve(params)
+        steps = steps_for(params, result)
+        comparison = compare(params) if result.region is Region.ACTIVE else None
+
+    return render_template(
+        "index.html",
+        values=values,
+        errors=errors or {},
+        fields=FIELDS,
+        result=result,
+        params=params,
+        steps=steps,
+        comparison=comparison,
+        quantities=QUANTITIES,
+        compare_keys=COMPARE_KEYS,
+    )
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.add_template_filter(fmt_v, "v")
@@ -50,32 +72,15 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return render_template(
-            "index.html", values=DEFAULTS, errors={}, fields=FIELDS
-        )
+        params, _ = parse_form(DEFAULTS)
+        return _dashboard(DEFAULTS, params=params)
 
     @app.post("/calculate")
     def calculate():
         params, errors = parse_form(request.form)
         if params is None:
-            return (
-                render_template(
-                    "index.html", values=request.form, errors=errors, fields=FIELDS
-                ),
-                400,
-            )
-
-        result = solve(params)
-        comparison = compare(params) if result.region is Region.ACTIVE else None
-        return render_template(
-            "result.html",
-            result=result,
-            params=params,
-            steps=steps_for(params, result),
-            comparison=comparison,
-            quantities=QUANTITIES,
-            compare_keys=COMPARE_KEYS,
-        )
+            return _dashboard(request.form, errors=errors), 400
+        return _dashboard(request.form, params=params)
 
     return app
 

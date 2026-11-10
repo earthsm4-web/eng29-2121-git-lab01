@@ -665,13 +665,94 @@ walk-through heading and `IB = 0`, and still no `Approximate`.
 
 - [ ] **Step 5: Commit** — `git add ... && git commit -m "feat: circuit schematic and calculation walk-through on the result page"`.
 
+### Task 7: Single-page dashboard UI
+
+**Files:**
+- Modify: `app.py`, `templates/base.html`, `templates/index.html`, `templates/_schematic.html`, `templates/_steps.html`, `static/style.css`, `tests/test_routes.py`, `README.md`
+- Create: `templates/_comparison.html`
+- Delete: `templates/result.html`
+
+**Interfaces:**
+- Consumes: `parse_form`, `DEFAULTS`, `FIELDS`, `QUANTITIES`, `COMPARE_KEYS`, `solve`, `compare`, `steps_for`, `Region`, and the `v`/`i`/`r`/`num` filters.
+- Produces: `_dashboard(values, errors=None, params=None) -> str` in `app.py`; the template context gains `fields` as four-tuples `(name, label, unit, description)` and keeps `result`, `params`, `steps`, `comparison`, `quantities`, `compare_keys`. No new public API.
+
+- [ ] **Step 1: Write the failing route tests**
+
+Append to `tests/test_routes.py`:
+
+```python
+def test_index_renders_the_dashboard_with_defaults(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "Lab 02: BJT DC Bias Web App" in html
+    assert "Input Parameters" in html
+    assert "Circuit: Common-Emitter Amplifier" in html
+    assert "DC Bias Results" in html
+    assert "Week 2 Goal" in html
+    assert 'class="schematic"' in html
+    assert "1.2863 mA" in html
+    assert "4.6550 V" in html
+
+
+def test_invalid_input_hides_the_results(client):
+    rv = client.post("/calculate", data=dict(GOOD, re="0", rc="9.1"))
+    assert rv.status_code == 400
+    html = rv.get_data(as_text=True)
+    assert "RE must be greater than 0" in html
+    assert 'value="9.1"' in html
+    assert "Fix the input errors" in html
+    assert "1.2863 mA" not in html
+```
+
+- [ ] **Step 2: Run to watch them fail**
+
+Run: `.\.venv\Scripts\python -m pytest tests/test_routes.py -q`
+Expected: the first test fails on the missing dashboard text (`GET /` renders only the form); the second fails on `Fix the input errors`. The other 11 route tests still pass.
+
+- [ ] **Step 3: Implement the shared dashboard renderer in `app.py`**
+
+Add `_dashboard(values, errors=None, params=None)` that solves only when `params` is given, builds `steps` and `comparison` exactly as the old `calculate` route did, and renders `index.html` with `values`, `errors or {}`, `fields`, `result`, `params`, `steps`, `comparison`, `quantities`, `compare_keys`. `GET /` calls `parse_form(DEFAULTS)` and passes the parsed params, so the first load is fully populated. `POST /calculate` returns `_dashboard(request.form, errors)`, 400 when parsing fails, else `_dashboard(request.form, params=parsed)`. Extend each `FIELDS` entry with its description: `Supply Voltage`, `Upper Divider`, `Lower Divider`, `Collector Resistor`, `Emitter Resistor`, `Current Gain`, `Base-Emitter Voltage`.
+
+- [ ] **Step 4: Write `base.html`**
+
+Header with an inline-SVG chip icon, `h1` exactly `Lab 02: BJT DC Bias Web App`, subtitle `ENG29 2121 – Common Emitter (Voltage Divider Bias)`, and the right-hand badge `Computer Programming for Electrical Engineers` with a code icon. `<title>` matches the `h1`. Keep `{% block content %}` inside `<main class="page">`.
+
+- [ ] **Step 5: Write `index.html`**
+
+Three-card grid. Input card heading `Input Parameters` with a gear icon; each row is the label (`V<sub>CC</sub>`; `β` for beta) plus its description, the input, a unit chip (`V`, `kΩ`, `–`), and an `aria-hidden` chevron; submit button text `Calculate DC Bias` with a calculator icon. Circuit card heading `Circuit: Common-Emitter Amplifier` with a nodes icon, containing `{% include "_schematic.html" %}`. Results card heading `DC Bias Results` with a bars icon, a zebra table of `quantities` rendering `{{ label[0] }}<sub>{{ label[1:] }}</sub>`, and the region callout: `Active region — equations apply` (green check), `Saturation — active equations do not apply` (amber, keeps the words `do not apply`), `Cutoff — transistor off` (slate). When `result` is `None`, both cards render `Fix the input errors to see the circuit.` / `...the results.` instead of numbers. Below the grid: the `Week 2 Goal` banner (target icon, pill, the screenshot's sentence), then `{% include "_steps.html" %}`, then `{% if comparison %}{% include "_comparison.html" %}{% endif %}`.
+
+- [ ] **Step 6: Write the partials and delete `result.html`**
+
+`_steps.html`: wrap the existing 9/4/2-row table in a card with heading `How this was calculated`; keep every row string unchanged. `_comparison.html`: the table and verdict text moved out of `result.html`, keeping the heading `Approximate method check` and the word `Approximate`. `_schematic.html`: add `Q1 NPN (β = {{ params.beta|num }})` beside the transistor; keep node voltages and the Q-point box. Delete `templates/result.html`.
+
+- [ ] **Step 7: Rewrite `static/style.css`**
+
+Tokens: page `#eef2f6`, card `#fff`, ink `#16202a`, muted `#5d6b78`, line `#dbe4ec`, teal `#0f766e`, teal-dark `#0b5d57`, green `#1d6f42`, amber `#a35a00`. Segoe UI stack, `font-variant-numeric: tabular-nums` on values. Grid `1.05fr 1.35fr 1fr`, gap `1rem`, max-width `78rem`; two columns at 1100 px, one at 860 px. Cards: `border: 1px solid var(--line)`, `border-radius: 10px`, subtle shadow, `padding: 1rem 1.1rem`. Zebra rows `tbody tr:nth-child(even) { background: #f4f7fa; }`. Callout colours keyed to `region.value`. Keep a visible `:focus-visible` ring on inputs and the button. Text labels accompany every colour.
+
+- [ ] **Step 8: Run the full suite**
+
+Run: `.\.venv\Scripts\python -m pytest -q`
+Expected: 54 passed (52 existing + 2 new).
+
+- [ ] **Step 9: Verify the live page**
+
+Restart the demo and check `GET /` (header, three headings, `1.2863 mA`, `4.6550 V`), a Saturation POST (`do not apply`), a Cutoff POST (no `Approximate`), and an invalid POST (400, `Fix the input errors`).
+
+- [ ] **Step 10: Update `README.md` and commit**
+
+Replace the layout block: `templates/index.html` is the dashboard, `templates/result.html` no longer exists, add `_steps.html`/`_comparison.html`. Then:
+
+```bash
+git add app.py templates static tests/test_routes.py README.md
+git commit -m "feat: single-page dashboard UI matching the lab handout"
+```
+
 ## Self-Review
 
-**1. Spec coverage.** Form and defaults → Task 4. Exact equations → Task 2. Approximate equations and comparison → Task 3. Stiffness rule → Task 1 (`is_stiff`) and Task 3 (surfaced). Region logic and `VCE_SAT` → Task 2. Validation → Task 1. Units/formatting → Task 4. Separate logic/templates/CSS/tests → Tasks 1–5. Localhost demo → Task 5. GitHub commit → Tasks 1–5 commit each task, push in Task 5.
+**1. Spec coverage.** Form and defaults → Task 4. Exact equations → Task 2. Approximate equations and comparison → Task 3. Stiffness rule → Task 1 (`is_stiff`) and Task 3 (surfaced). Region logic and `VCE_SAT` → Task 2. Validation → Task 1. Units/formatting → Task 4. Separate logic/templates/CSS/tests → Tasks 1–5. Localhost demo → Task 5. GitHub commit → Tasks 1–5 commit each task, push in Task 5. Calculation illustrations → Task 6. Single-page dashboard, first-load results, and the 400 placeholder → Task 7.
 
 **2. Step scan.** Each step names one action with checkable output. No `TBD`, no "handle edge cases".
 
-**3. Type consistency.** `BiasParams` fields and the `vbb`/`rbb`/`is_stiff` properties are used identically in Tasks 1–3. `BiasResult.region` is a `Region` everywhere; `Comparison.diffs` keys `ic, ie, vce, vb` match Task 3's test and Task 4's template loop. `parse_form` returns a 2-tuple everywhere.
+**3. Type consistency.** `BiasParams` fields and the `vbb`/`rbb`/`is_stiff` properties are used identically in Tasks 1–3. `BiasResult.region` is a `Region` everywhere; `Comparison.diffs` keys `ic, ie, vce, vb` match Task 3's test and Task 4's template loop. `parse_form` returns a 2-tuple everywhere. Task 7's four-tuple `FIELDS` entries are produced and consumed only in `app.py` and `index.html` within that task.
 
 **4. Review Focus.** Every line has a test in the named task: high β and tiny R1 and the VCE boundary in Task 2; numeric-format variants in Task 1; `VBE ≥ VCC` in Task 1.
 

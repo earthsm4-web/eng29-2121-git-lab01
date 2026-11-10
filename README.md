@@ -97,8 +97,13 @@ bjt/params.py       validated SI-unit inputs
 bjt/validate.py     form strings -> params or field errors
 bjt/bias.py         exact and approximate solvers, region classification
 bjt/format.py       V / mA / µA display formatting
-templates/          Jinja templates
-static/style.css    single stylesheet
+bjt/steps.py        walk-through derivation rows
+templates/base.html dashboard shell with header
+templates/index.html single-page dashboard (replaces form + result pages)
+templates/_schematic.html inline-SVG circuit with computed node voltages
+templates/_steps.html   How this was calculated card
+templates/_comparison.html Approximate method check card
+static/style.css           single stylesheet
 tests/              pytest suite
 ```
 

@@ -1,21 +1,30 @@
-<h2>How this was calculated</h2>
-<table class="steps">
-  <thead>
-    <tr>
-      <th>Quantity</th>
-      <th>Formula</th>
-      <th>Substitution</th>
-      <th>Result</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for step in steps %}
-    <tr>
-      <td class="step-quantity">{{ step.quantity }}</td>
-      <td class="step-formula">{{ step.formula }}</td>
-      <td class="step-substitution">{{ step.substitution }}</td>
-      <td class="step-result">{{ step.result }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<section class="card steps-card">
+  <h2 class="card-title">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="19" cy="18" r="1.6" fill="currentColor"/>
+    </svg>
+    How this was calculated
+  </h2>
+  <table class="steps">
+    <thead>
+      <tr>
+        <th>Quantity</th>
+        <th>Formula</th>
+        <th>Substitution</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for step in steps %}
+      <tr>
+        <td class="step-quantity">{{ step.quantity }}</td>
+        <td class="step-formula">{{ step.formula }}</td>
+        <td class="step-substitution">{{ step.substitution }}</td>
+        <td class="step-result">{{ step.result }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
