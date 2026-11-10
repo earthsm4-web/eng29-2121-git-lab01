@@ -3,7 +3,8 @@
 from flask import Flask, render_template, request
 
 from bjt.bias import Region, compare, solve
-from bjt.format import fmt_i, fmt_v
+from bjt.format import fmt_i, fmt_num, fmt_r, fmt_v
+from bjt.steps import steps_for
 from bjt.validate import parse_form
 
 DEFAULTS = {
@@ -44,6 +45,8 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.add_template_filter(fmt_v, "v")
     app.add_template_filter(fmt_i, "i")
+    app.add_template_filter(fmt_r, "r")
+    app.add_template_filter(fmt_num, "num")
 
     @app.get("/")
     def index():
@@ -67,6 +70,8 @@ def create_app() -> Flask:
         return render_template(
             "result.html",
             result=result,
+            params=params,
+            steps=steps_for(params, result),
             comparison=comparison,
             quantities=QUANTITIES,
             compare_keys=COMPARE_KEYS,

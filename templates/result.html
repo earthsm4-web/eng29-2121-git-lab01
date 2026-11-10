@@ -16,6 +16,9 @@
 </p>
 {% endif %}
 
+<h2>Circuit</h2>
+{% include "_schematic.html" %}
+
 <h2>Operating point</h2>
 <dl class="qpoint">
   {% for key, label, kind in quantities %}
@@ -23,6 +26,8 @@
   <dd>{% if kind == "i" %}{{ (result|attr(key))|i }}{% else %}{{ (result|attr(key))|v }}{% endif %}</dd>
   {% endfor %}
 </dl>
+
+{% include "_steps.html" %}
 
 {% if comparison %}
 <h2>Approximate method check</h2>

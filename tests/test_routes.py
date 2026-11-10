@@ -58,3 +58,18 @@ def test_saturation_warns_that_active_equations_do_not_apply(client):
     html = client.post("/calculate", data=dict(GOOD, rc="10")).get_data(as_text=True)
     assert "Saturation" in html
     assert "do not apply" in html
+
+
+def test_active_page_shows_schematic_and_walkthrough(client):
+    html = client.post("/calculate", data=GOOD).get_data(as_text=True)
+    assert 'class="schematic"' in html
+    assert "R1 47 kΩ" in html
+    assert "RB = R1 ∥ R2" in html
+    assert "4.6550 V" in html
+
+
+def test_cutoff_page_still_shows_the_walkthrough(client):
+    html = client.post("/calculate", data=dict(GOOD, r1="100", r2="1")).get_data(as_text=True)
+    assert "How this was calculated" in html
+    assert "IB = 0" in html
+    assert "Approximate" not in html

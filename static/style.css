@@ -216,3 +216,79 @@ table.compare tbody tr:last-child th,
 table.compare tbody tr:last-child td {
   border-bottom: 0;
 }
+
+/* Schematic */
+
+.schematic {
+  display: block;
+  width: 100%;
+  max-width: 34rem;
+  height: auto;
+  padding: 0.75rem;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.schematic .node {
+  fill: var(--accent);
+  font-weight: 600;
+}
+
+.schematic .pin {
+  fill: var(--muted);
+  font-weight: 700;
+}
+
+/* Calculation walk-through */
+
+table.steps {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+table.steps th,
+table.steps td {
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+table.steps thead th {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: #eef2f6;
+}
+
+table.steps tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.step-quantity {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.step-formula {
+  color: var(--muted);
+}
+
+.step-substitution {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88rem;
+}
+
+.step-result {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
