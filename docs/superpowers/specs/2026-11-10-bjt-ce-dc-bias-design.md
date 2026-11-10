@@ -179,7 +179,111 @@ Python (`bjt/steps.py`), never in Jinja. Each row is
 `fmt_r` (Ω → kΩ) and `fmt_num` (%g-style, trailing zeros trimmed) join the
 display helpers.
 
-## Delivery notes (not part of the app design)
+## Addendum 2 — single-page dashboard UI (approved 2026-11-10)
+
+Redesigns the presentation to match the lab handout's target screenshot.
+No engineering logic changes: `bjt/` and its tests are untouched.
+
+**Intent.** One page that reads like a lab instrument: parameters on the
+left, the circuit in the middle, the Q-point on the right, and the
+derivation underneath for whoever wants the "why".
+
+**Goals**
+
+- `GET /` solves the lab defaults and renders the full dashboard, so the
+  first load already looks like the screenshot.
+- `POST /calculate` renders the same template with the submitted values:
+  200 with results, or 400 with per-field errors.
+- Header (title, subtitle, course badge), three cards, region callout,
+  Week 2 Goal banner, then the walk-through and approximate-check cards
+  below the columns (user's choice).
+- All existing content, wording, units, and region semantics survive.
+
+**Non-goals.** Functional unit switching (the chevron is decorative; units
+stay V / kΩ / –), JavaScript, any new dependency, dark mode, print styles,
+new maths, new inputs, changing the lab defaults (`12, 47, 10, 4.7, 1, 100,
+0.7`).
+
+**Anti-goals.** Losing the walk-through or comparison tables; showing stale
+results while input errors are displayed; a validation failure as HTTP 500;
+changing the exact region labels `Active` / `Saturation` / `Cutoff`;
+duplicating an engineering formula in Jinja.
+
+**Approaches considered**
+
+| # | Approach | Verdict |
+|---|---|---|
+| A | One page; `GET /` solves defaults and renders everything; one template for GET and POST | **chosen** — matches the screenshot on first load, no empty state, one template |
+| B | One page, empty result cards until Calculate | rejected — extra empty state to design and test; first load does not match |
+| C | Keep two pages, restyle each | rejected — the screenshot is one page; needs navigation |
+
+**Design**
+
+- Data flow. `GET /` builds `BiasParams` from `DEFAULTS`, calls `solve`,
+  `compare` (active only), `steps_for`, and renders `index.html`. A new
+  helper `render_dashboard(values, errors=None, params=None)` keeps both
+  routes identical. On a 400 the template gets `params=None`; the circuit
+  and results cards show a dashed "Fix the input errors to see the
+  results" placeholder instead of stale numbers.
+- Layout. `base.html` owns the header and page shell; `index.html` is a
+  three-column CSS grid (`1.05fr 1.35fr 1fr`, max-width 78rem) that
+  collapses to two columns at 1100 px and one at 860 px. Below the grid:
+  the Week 2 Goal banner, then the walk-through card, then the comparison
+  card (active only).
+- Cards. Each has an inline-SVG icon, a heading, and white background with
+  a 1 px border and 10 px radius: **Input Parameters** (gear), **Circuit:
+  Common-Emitter Amplifier** (nodes), **DC Bias Results** (bars). The
+  submit button spans the input card and carries a calculator icon.
+- Inputs. Label is `symbol<sub>…</sub> (Name)`; the value box, a unit chip
+  (`V`, `kΩ`, `–`), and a decorative chevron sit on one row. Errors render
+  under their own field, as today.
+- Results. Zebra table of `IB, IC, IE, VBE, VCE, VB, VC, VE` with
+  subscripted symbols, right-aligned bold values. Under it, the region
+  callout replaces the old badge + warning: green check for Active
+  ("VCE = … V > 0.2 V"), amber for Saturation (keeps the words "do not
+  apply"), slate for Cutoff. The region word itself stays in the DOM.
+- Schematic. The existing SVG keeps its node voltages and Q-point box and
+  gains a `Q1 NPN (β = …)` label next to the transistor; the card is
+  centred and scales to its column.
+- Walk-through. `_steps.html` becomes a card with the same heading text
+  `How this was calculated`; the 9/4/2 rows and their strings are
+  unchanged. `_comparison.html` is extracted from `result.html` into its
+  own card, keeping the `Approximate` heading and the exact/approx/diff
+  table.
+- Goal banner. Target icon, a "Week 2 Goal" pill, and the screenshot's
+  sentence as static text.
+- Icons. Hand-written inline SVG, `currentColor`, `aria-hidden="true"`,
+  18 px; no icon font or dependency.
+- Styling. Single `style.css` rewritten around tokens: page `#eef2f6`,
+  card `#fff`, ink `#16202a`, muted `#5d6b78`, line `#dbe4ec`, teal
+  `#0f766e`; Segoe UI stack; tabular numerals; visible focus rings;
+  region colours reused for the callout; text labels accompany every
+  colour so nothing is colour-only.
+
+**Files**
+
+```
+templates/base.html        header, page shell
+templates/index.html       dashboard (replaces both form and result pages)
+templates/_schematic.html  add Q1 label, size to card
+templates/_steps.html      card wrapper
+templates/_comparison.html new card partial
+templates/result.html      deleted
+static/style.css           rewritten
+app.py                     GET solves defaults; shared dashboard renderer
+tests/test_routes.py       GET dashboard test, 400 placeholder test
+```
+
+**Tests.** `GET /` 200 and contains the header title, the three card
+headings, the goal sentence, `class="schematic"`, and the default Q-point
+(`1.2863 mA`, `4.6550 V`). `POST /calculate` with invalid input returns
+400, keeps the typed value, shows the field error, and does not render a
+Q-point. Every existing route test keeps passing unchanged.
+
+**Left to the builder.** Exact icon shapes, spacing scale, breakpoint
+values, hover/focus styling, and the placeholder wording.
+
+
 
 Blockers found during recon, to be handled in Task 0 of the plan:
 git is installed but not on `PATH`; `git config user.name/email` are unset;

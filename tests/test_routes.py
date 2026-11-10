@@ -91,3 +91,25 @@ def test_schematic_reports_the_cutoff_qpoint(client):
     html = client.post("/calculate", data=dict(GOOD, r1="100", r2="1")).get_data(as_text=True)
     assert "IC 0.000 µA" in html
     assert "VCE 12.0000 V" in html
+
+
+def test_index_renders_the_dashboard_with_defaults(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "Lab 02: BJT DC Bias Web App" in html
+    assert "Input Parameters" in html
+    assert "Circuit: Common-Emitter Amplifier" in html
+    assert "DC Bias Results" in html
+    assert "Week 2 Goal" in html
+    assert 'class="schematic"' in html
+    assert "1.2863 mA" in html
+    assert "4.6550 V" in html
+
+
+def test_invalid_input_hides_the_results(client):
+    rv = client.post("/calculate", data=dict(GOOD, re="0", rc="9.1"))
+    assert rv.status_code == 400
+    html = rv.get_data(as_text=True)
+    assert "RE must be greater than 0" in html
+    assert 'value="9.1"' in html
+    assert "Fix the input errors" in html
+    assert "1.2863 mA" not in html
