@@ -7,15 +7,17 @@ STIFFNESS_FACTOR = 10.0
 
 @dataclass(frozen=True)
 class BiasParams:
-    """Voltage-divider common-emitter bias inputs, already in SI units."""
+    """Circuit inputs in SI units, for any single-supply common-emitter bias mode."""
 
     vcc: float
-    r1: float
-    r2: float
     rc: float
-    re: float
     beta: float
     vbe: float
+    mode: str = "divider"
+    rb: float | None = None
+    r1: float | None = None
+    r2: float | None = None
+    re: float | None = None
 
     @property
     def vbb(self) -> float:

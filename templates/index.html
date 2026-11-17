@@ -12,8 +12,29 @@
     </h2>
 
     <form method="post" action="{{ url_for('calculate') }}" class="bias-form">
-      {% for name, label, unit, description in fields %}
+      <input type="hidden" name="mode" value="{{ mode }}">
+
       <div class="field">
+        <label for="mode-select">โหมดวงจร</label>
+        <div class="input-row">
+          <select id="mode-select" name="mode" onchange="toggleFields()">
+            <option value="divider" {% if mode == "divider" %}selected{% endif %}>Voltage Divider Bias</option>
+            <option value="fixed" {% if mode == "fixed" %}selected{% endif %}>Fixed Bias</option>
+            <option value="emitter" {% if mode == "emitter" %}selected{% endif %}>Emitter Bias</option>
+          </select>
+        </div>
+      </div>
+
+      {% set mode_fields = {
+        "fixed": ["vcc", "rb", "rc", "beta", "vbe"],
+        "emitter": ["vcc", "rb", "re", "rc", "beta", "vbe"],
+        "divider": ["vcc", "r1", "r2", "rc", "re", "beta", "vbe"],
+      } %}
+      {% set active_fields = mode_fields.get(mode, mode_fields["divider"]) %}
+
+      {% for name, label, unit, description in fields %}
+      {% if name in active_fields %}
+      <div class="field" data-field="{{ name }}">
         <label for="{{ name }}">
           {% if name == "beta" %}β{% else %}{{ label[0] }}<sub>{{ label[1:] }}</sub>{% endif %}
           <span class="field-name">({{ description }})</span>
@@ -33,6 +54,7 @@
         <p class="error">{{ errors[name] }}</p>
         {% endif %}
       </div>
+      {% endif %}
       {% endfor %}
 
       <button type="submit">
@@ -65,10 +87,26 @@
       </svg>
       Circuit: Common-Emitter Amplifier
     </h2>
+    <div id="schematic-container">
+      {% if result %}
+      {% include "_schematic.html" %}
+      {% else %}
+      {% set params = values %}
+      {% set mode = mode %}
+      {% include "_schematic.html" %}
+      {% endif %}
+    </div>
     {% if result %}
-    {% include "_schematic.html" %}
-    {% else %}
-    <p class="placeholder">Fix the input errors to see the circuit.</p>
+    <div class="circuit-metrics">
+      <div class="metric">
+        <span class="metric-label">IC</span>
+        <span class="metric-value" id="m-ic">{{ result.ic|i }}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">VCE</span>
+        <span class="metric-value" id="m-vce">{{ result.vce|v }}</span>
+      </div>
+    </div>
     {% endif %}
   </section>
 
@@ -154,4 +192,73 @@
 {% include "_comparison.html" %}
 {% endif %}
 {% endif %}
+
+<script>
+function toggleFields() {
+  const mode = document.getElementById("mode-select").value;
+  document.querySelectorAll(".bias-form .field[data-field]").forEach(el => {
+    const field = el.getAttribute("data-field");
+    const show = (
+      (mode === "divider" && ["vcc","r1","r2","rc","re","beta","vbe"].includes(field)) ||
+      (mode === "fixed" && ["vcc","rb","rc","beta","vbe"].includes(field)) ||
+      (mode === "emitter" && ["vcc","rb","re","rc","beta","vbe"].includes(field))
+    );
+    el.style.display = show ? "grid" : "none";
+  });
+  updateSchematic();
+}
+
+function updateSchematic() {
+  const mode = document.getElementById("mode-select").value;
+
+  // Toggle mode-specific SVG groups
+  document.querySelectorAll(".schematic-mode").forEach(el => {
+    const classes = Array.from(el.classList).filter(cls => cls.startsWith("mode-"));
+    const shouldShow = classes.includes(`mode-${mode}`);
+    el.style.display = shouldShow ? "" : "none";
+  });
+
+  // Update input-derived labels from form values
+  function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+  function getInput(name) {
+    const el = document.getElementById(name);
+    return el ? el.value.trim() : "";
+  }
+
+  const vcc = getInput("vcc");
+  const rb = getInput("rb");
+  const r1 = getInput("r1");
+  const r2 = getInput("r2");
+  const rc = getInput("rc");
+  const re = getInput("re");
+  const beta = getInput("beta");
+
+  if (vcc) setText("s-vcc", `VCC ${vcc} V`);
+  if (rb) setText("s-rb", `RB ${rb} kΩ`);
+  if (r1) setText("s-r1", `R1 ${r1} kΩ`);
+  if (r2) setText("s-r2", `R2 ${r2} kΩ`);
+  if (rc) setText("s-rc", `RC ${rc} kΩ`);
+  if (re) setText("s-re", `RE ${re} kΩ`);
+  if (re) setText("s-re-right", `RE ${re} kΩ`);
+  if (beta) setText("s-beta", `(β = ${beta})`);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  toggleFields();
+  updateSchematic();
+
+  document.querySelectorAll(".bias-form input[type='text']").forEach(input => {
+    input.addEventListener("input", updateSchematic);
+  });
+
+  const modeSelect = document.getElementById("mode-select");
+  if (modeSelect) {
+    modeSelect.removeAttribute("onchange");
+    modeSelect.addEventListener("change", toggleFields);
+  }
+});
+</script>
 {% endblock %}

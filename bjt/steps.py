@@ -145,10 +145,218 @@ def _cutoff_steps(p: BiasParams, r: BiasResult) -> list[Step]:
     ]
 
 
+def _fixed_cutoff_steps(p: BiasParams, r: BiasResult) -> list[Step]:
+    return [
+        Step(
+            "VBB",
+            "VBB = VCC",
+            f"{_operand(p.vcc)}",
+            fmt_v(p.vcc),
+        ),
+        Step(
+            "IB",
+            "VBB ≤ VBE ⇒ IB = 0",
+            f"{p.vcc:.4f} ≤ {fmt_num(p.vbe)}",
+            fmt_i(r.ib),
+        ),
+    ]
+
+
+def _emitter_cutoff_steps(p: BiasParams, r: BiasResult) -> list[Step]:
+    return [
+        Step(
+            "VBB",
+            "VBB = VCC",
+            f"{_operand(p.vcc)}",
+            fmt_v(p.vcc),
+        ),
+        Step(
+            "IB",
+            "VBB ≤ VBE ⇒ IB = 0",
+            f"{p.vcc:.4f} ≤ {fmt_num(p.vbe)}",
+            fmt_i(r.ib),
+        ),
+    ]
+
+
+def _fixed_active_steps(p: BiasParams, r: BiasResult) -> list[Step]:
+    rb = _operand(p.rb / 1000.0)
+    rc = _kohm(p.rc)
+    return [
+        Step(
+            "IB",
+            "IB = (VCC − VBE) / RB",
+            f"({_operand(p.vcc)} − {_operand(p.vbe)}) / {rb}",
+            fmt_i(r.ib),
+        ),
+        Step(
+            "IC",
+            "IC = β · IB",
+            f"{_operand(p.beta)} · {_operand(r.ib * 1e6)} µA",
+            fmt_i(r.ic),
+        ),
+        Step(
+            "IE",
+            "IE = (β+1) · IB",
+            f"{_operand(p.beta + 1)} · {_operand(r.ib * 1e6)} µA",
+            fmt_i(r.ie),
+        ),
+        Step(
+            "VE",
+            "VE = 0 V (emitter grounded)",
+            "0",
+            fmt_v(r.ve),
+        ),
+        Step(
+            "VB",
+            "VB = VE + VBE",
+            f"{_operand(r.ve)} + {_operand(p.vbe)}",
+            fmt_v(r.vb),
+        ),
+        Step(
+            "VC",
+            "VC = VCC − IC · RC",
+            f"{_operand(p.vcc)} − {_operand(r.ic * 1e3)} mA · {rc} kΩ",
+            fmt_v(r.vc),
+        ),
+        Step(
+            "VCE",
+            "VCE = VC − VE",
+            f"{_operand(r.vc)} − {_operand(r.ve)}",
+            fmt_v(r.vce),
+        ),
+    ]
+
+
+def _emitter_active_steps(p: BiasParams, r: BiasResult) -> list[Step]:
+    rb = _operand(p.rb / 1000.0)
+    re = _kohm(p.re)
+    rc = _kohm(p.rc)
+    return [
+        Step(
+            "IB",
+            "IB = (VCC − VBE) / [RB + (β+1) · RE]",
+            f"({_operand(p.vcc)} − {_operand(p.vbe)}) / "
+            f"({rb} + {_operand(p.beta + 1)} · {re})",
+            fmt_i(r.ib),
+        ),
+        Step(
+            "IC",
+            "IC = β · IB",
+            f"{_operand(p.beta)} · {_operand(r.ib * 1e6)} µA",
+            fmt_i(r.ic),
+        ),
+        Step(
+            "IE",
+            "IE = (β+1) · IB",
+            f"{_operand(p.beta + 1)} · {_operand(r.ib * 1e6)} µA",
+            fmt_i(r.ie),
+        ),
+        Step(
+            "VE",
+            "VE = IE · RE",
+            f"{_operand(r.ie * 1e3)} mA · {re} kΩ",
+            fmt_v(r.ve),
+        ),
+        Step(
+            "VB",
+            "VB = VE + VBE",
+            f"{_operand(r.ve)} + {_operand(p.vbe)}",
+            fmt_v(r.vb),
+        ),
+        Step(
+            "VC",
+            "VC = VCC − IC · RC",
+            f"{_operand(p.vcc)} − {_operand(r.ic * 1e3)} mA · {rc} kΩ",
+            fmt_v(r.vc),
+        ),
+        Step(
+            "VCE",
+            "VCE = VC − VE",
+            f"{_operand(r.vc)} − {_operand(r.ve)}",
+            fmt_v(r.vce),
+        ),
+    ]
+
+
+def _fixed_saturation_steps(p: BiasParams, r: BiasResult) -> list[Step]:
+    rc = _kohm(p.rc)
+    return [
+        Step(
+            "IC",
+            "IC = (VCC − VCE,sat) / RC",
+            f"({_operand(p.vcc)} − {VCE_SAT:g}) / {rc}",
+            fmt_i(r.ic),
+        ),
+        Step(
+            "IB",
+            "IB = IC / β",
+            f"{_operand(r.ic * 1e3)} mA / {_operand(p.beta)}",
+            fmt_i(r.ib),
+        ),
+        Step(
+            "IE",
+            "IE = IC · (β+1)/β",
+            f"{_operand(r.ic * 1e3)} mA · {_operand(p.beta + 1)}/{_operand(p.beta)}",
+            fmt_i(r.ie),
+        ),
+        Step(
+            "VE",
+            "VE = 0 V (emitter grounded)",
+            "0",
+            fmt_v(r.ve),
+        ),
+    ]
+
+
+def _emitter_saturation_steps(p: BiasParams, r: BiasResult) -> list[Step]:
+    rc = _kohm(p.rc)
+    re = _kohm(p.re)
+    return [
+        Step(
+            "IC",
+            "IC = (VCC − VCE,sat) / (RC + RE · (β+1)/β)",
+            f"({_operand(p.vcc)} − {VCE_SAT:g}) / "
+            f"({rc} + {re} · {_operand(p.beta + 1)}/{_operand(p.beta)})",
+            fmt_i(r.ic),
+        ),
+        Step(
+            "IB",
+            "IB = IC / β",
+            f"{_operand(r.ic * 1e3)} mA / {_operand(p.beta)}",
+            fmt_i(r.ib),
+        ),
+        Step(
+            "IE",
+            "IE = IC · (β+1)/β",
+            f"{_operand(r.ic * 1e3)} mA · {_operand(p.beta + 1)}/{_operand(p.beta)}",
+            fmt_i(r.ie),
+        ),
+        Step(
+            "VE",
+            "VE = IE · RE",
+            f"{_operand(r.ie * 1e3)} mA · {re} kΩ",
+            fmt_v(r.ve),
+        ),
+    ]
+
+
 def steps_for(p: BiasParams, result: BiasResult) -> list[Step]:
-    """Derivation rows appropriate to the operating region."""
+    """Derivation rows appropriate to the operating region and bias mode."""
     if result.region is Region.CUTOFF:
+        if p.mode == "fixed":
+            return _fixed_cutoff_steps(p, result)
+        if p.mode == "emitter":
+            return _emitter_cutoff_steps(p, result)
         return _cutoff_steps(p, result)
     if result.region is Region.SATURATION:
+        if p.mode == "fixed":
+            return _fixed_saturation_steps(p, result)
+        if p.mode == "emitter":
+            return _emitter_saturation_steps(p, result)
         return _saturation_steps(p, result)
+    if p.mode == "fixed":
+        return _fixed_active_steps(p, result)
+    if p.mode == "emitter":
+        return _emitter_active_steps(p, result)
     return _active_steps(p, result)

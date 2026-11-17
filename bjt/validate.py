@@ -5,14 +5,21 @@ from collections.abc import Mapping
 
 from .params import BiasParams
 
-FIELDS = ("vcc", "r1", "r2", "rc", "re", "beta", "vbe")
-OHM_FIELDS = ("r1", "r2", "rc", "re")
+MODE_FIELDS = {
+    "fixed": ("vcc", "rb", "rc", "beta", "vbe"),
+    "emitter": ("vcc", "rb", "re", "rc", "beta", "vbe"),
+    "divider": ("vcc", "r1", "r2", "rc", "re", "beta", "vbe"),
+}
+
+OHM_FIELDS = ("r1", "r2", "rc", "re", "rb")
+
 DISPLAY = {
     "vcc": "VCC",
     "r1": "R1",
     "r2": "R2",
     "rc": "RC",
     "re": "RE",
+    "rb": "RB",
     "beta": "beta",
     "vbe": "VBE",
 }
@@ -20,12 +27,20 @@ DISPLAY = {
 
 def parse_form(
     form: Mapping[str, str],
+    mode: str = "divider",
 ) -> tuple[BiasParams | None, dict[str, str]]:
-    """Return (params, {}) for valid input, or (None, errors) otherwise."""
+    """Return (params, {}) for valid input, or (None, errors) otherwise.
+
+    ``mode`` selects which input fields are required and how they are named.
+    Resistances are converted from kΩ (form unit) to Ω (SI unit) once, here.
+    """
+    if mode not in MODE_FIELDS:
+        mode = "divider"
+
     errors: dict[str, str] = {}
     values: dict[str, float] = {}
 
-    for field in FIELDS:
+    for field in MODE_FIELDS[mode]:
         raw = (form.get(field) or "").strip()
         name = DISPLAY[field]
         if not raw:
@@ -61,6 +76,7 @@ def parse_form(
         return None, errors
 
     for field in OHM_FIELDS:
-        values[field] *= 1000.0
+        if field in values:
+            values[field] *= 1000.0
 
-    return BiasParams(**values), {}
+    return BiasParams(mode=mode, **values), {}

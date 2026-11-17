@@ -2,14 +2,14 @@
 
 from flask import Flask, render_template, request
 
-from bjt.bias import Region, compare, solve
+from bjt.bias import Region, compare, solve, solve_bias
 from bjt.format import fmt_i, fmt_num, fmt_r, fmt_v
 from bjt.steps import steps_for
 from bjt.validate import parse_form
 
 DEFAULTS = {
     "vcc": "12", "r1": "47", "r2": "10", "rc": "4.7",
-    "re": "1", "beta": "100", "vbe": "0.7",
+    "re": "1", "beta": "100", "vbe": "0.7", "mode": "divider",
 }
 
 FIELDS = [
@@ -45,9 +45,13 @@ def _dashboard(values, errors=None, params=None) -> str:
     """Render the single-page dashboard, solving only when params are valid."""
     result = steps = comparison = None
     if params is not None:
-        result = solve(params)
+        result = solve_bias(params)
         steps = steps_for(params, result)
-        comparison = compare(params) if result.region is Region.ACTIVE else None
+        comparison = (
+            compare(params)
+            if result.region is Region.ACTIVE and params.mode == "divider"
+            else None
+        )
 
     return render_template(
         "index.html",
@@ -60,6 +64,7 @@ def _dashboard(values, errors=None, params=None) -> str:
         comparison=comparison,
         quantities=QUANTITIES,
         compare_keys=COMPARE_KEYS,
+        mode=params.mode if params else "divider",
     )
 
 
@@ -72,12 +77,13 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        params, _ = parse_form(DEFAULTS)
+        params, _ = parse_form(DEFAULTS, mode=DEFAULTS.get("mode", "divider"))
         return _dashboard(DEFAULTS, params=params)
 
     @app.post("/calculate")
     def calculate():
-        params, errors = parse_form(request.form)
+        mode = request.form.get("mode", "divider")
+        params, errors = parse_form(request.form, mode=mode)
         if params is None:
             return _dashboard(request.form, errors=errors), 400
         return _dashboard(request.form, params=params)
