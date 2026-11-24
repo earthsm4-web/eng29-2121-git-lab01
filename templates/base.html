@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lab 03: BJT DC Bias Web App</title>
+  <title>Lab 04: CE Amplifier Lab (Analytical + SPICE)</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -30,17 +30,14 @@
           </g>
         </svg>
         <div>
-          <h1>Lab 03: BJT DC Bias Web App</h1>
-          <p class="subtitle">ENG29 2121 &ndash; Common Emitter (Voltage Divider Bias)</p>
+          <h1>CE Amplifier Lab</h1>
+          <p class="subtitle">ENG29 2121 &ndash; Analytical DC Bias + ngspice Simulation</p>
         </div>
       </div>
-      <span class="course-badge">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9 6 3 12l6 6M15 6l6 6-6 6" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span>Computer Programming for<br>Electrical Engineers</span>
-      </span>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="{{ url_for('index') }}" class="nav-link">DC Bias</a>
+        <a href="{{ url_for('spice_index') }}" class="nav-link">SPICE Sim</a>
+      </nav>
     </header>
 
     <main>

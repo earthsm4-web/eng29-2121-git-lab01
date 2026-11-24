@@ -1,15 +1,25 @@
 """Flask routes for the common-emitter DC bias calculator."""
 
+import math
+
 from flask import Flask, render_template, request
 
 from bjt.bias import Region, compare, solve, solve_bias
 from bjt.format import fmt_i, fmt_num, fmt_r, fmt_v
 from bjt.steps import steps_for
 from bjt.validate import parse_form
+from bjt.spice_engine import SpiceParams, run_op, run_ac, run_tran
+from bjt.spice_plot import plot_op_bars, plot_ac_response, plot_tran_waveforms
 
 DEFAULTS = {
     "vcc": "12", "r1": "47", "r2": "10", "rc": "4.7",
     "re": "1", "beta": "100", "vbe": "0.7", "mode": "divider",
+}
+
+SPICE_DEFAULTS = {
+    "vcc": "12", "rc": "2.2", "r1": "100", "r2": "22", "re": "1",
+    "rl": "10", "beta": "100", "vbe": "0.7",
+    "source_ampl": "0.010", "source_freq": "1000",
 }
 
 FIELDS = [
@@ -68,6 +78,33 @@ def _dashboard(values, errors=None, params=None) -> str:
     )
 
 
+def _spice_defaults() -> dict:
+    """Return default SPICE parameters (kΩ / V / Hz units for the form)."""
+    return dict(SPICE_DEFAULTS)
+
+
+def _spice_dashboard(values=None, errors=None, spice_result=None,
+                     spice_error=None, analytical_result=None,
+                     analytical_error=None, analysis="op", run_ts=None,
+                     run_artifact=None) -> str:
+    """Render the SPICE simulation page, separating SPICE from Analytical results."""
+    return render_template(
+        "spice.html",
+        values=values or {},
+        errors=errors or {},
+        spice_result=spice_result,
+        spice_error=spice_error,
+        analytical_result=analytical_result,
+        analytical_error=analytical_error,
+        analysis=analysis,
+        run_ts=run_ts,
+        run_artifact=run_artifact,
+        plot_op_bars=plot_op_bars,
+        plot_ac_response=plot_ac_response,
+        plot_tran_waveforms=plot_tran_waveforms,
+    )
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.add_template_filter(fmt_v, "v")
@@ -87,6 +124,142 @@ def create_app() -> Flask:
         if params is None:
             return _dashboard(request.form, errors=errors), 400
         return _dashboard(request.form, params=params)
+
+    def _parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
+        """Parse and validate SPICE form inputs (kΩ, V, Hz units).
+
+        Returns (values_in_SI, {}) or (None, errors).
+        """
+        errors: dict[str, str] = {}
+        values: dict[str, float] = {}
+
+        numeric_fields = {
+            "vcc": ("VCC", 0.0, None),
+            "rc": ("RC", 0.0, None),
+            "r1": ("R1", 0.0, None),
+            "r2": ("R2", 0.0, None),
+            "re": ("RE", 0.0, None),
+            "rl": ("RL", 0.0, None),
+            "beta": ("Beta", 1.0, None),
+            "vbe": ("VBE", 0.0, None),
+            "source_ampl": ("Source amplitude", 0.0, None),
+            "source_freq": ("Source frequency", 0.0, None),
+        }
+
+        for field, (label, lo, hi) in numeric_fields.items():
+            raw = (form.get(field) or "").strip()
+            if not raw:
+                errors[field] = f"{label} is required"
+                continue
+            try:
+                value = float(raw)
+            except ValueError:
+                errors[field] = f"{label} must be a number"
+                continue
+            if not math.isfinite(value):
+                errors[field] = f"{label} must be a number"
+                continue
+            if lo is not None and value <= lo:
+                errors[field] = f"{label} must be greater than {lo}"
+                continue
+            values[field] = value
+
+        if errors:
+            return None, errors
+
+        # Convert kΩ → Ω for resistances
+        for field in ("rc", "r1", "r2", "re", "rl"):
+            values[field] *= 1000.0
+
+        return values, {}
+
+    @app.get("/spice")
+    def spice_index():
+        return _spice_dashboard(values=_spice_defaults(), analysis="op")
+
+    @app.post("/spice/run")
+    def spice_run():
+        analysis = request.form.get("analysis", "op")
+        if analysis not in ("op", "ac", "tran"):
+            analysis = "op"
+
+        values, errors = _parse_spice_form(request.form)
+        if errors:
+            return _spice_dashboard(
+                values=request.form, errors=errors, analysis=analysis
+            ), 400
+
+        # Build validated SI-unit params for the SPICE engine
+        spice_params = SpiceParams(
+            vcc=values["vcc"],
+            rc=values["rc"],
+            r1=values["r1"],
+            r2=values["r2"],
+            re=values["re"],
+            rl=values["rl"],
+            beta=values["beta"],
+            vbe=values["vbe"],
+            source_ampl=values["source_ampl"],
+            source_freq=values["source_freq"],
+        )
+
+        # Also compute the analytical DC reference (same circuit, same params)
+        from bjt.params import BiasParams as _BiasParams
+        analytical_result = None
+        analytical_error = None
+        try:
+            analytical_params = _BiasParams(
+                vcc=values["vcc"], rc=values["rc"], beta=values["beta"],
+                vbe=values["vbe"], mode="divider",
+                r1=values["r1"], r2=values["r2"], re=values["re"],
+            )
+            from bjt.bias import solve_bias as _solve_bias
+            analytical_result = _solve_bias(analytical_params)
+        except Exception as exc:  # noqa: BLE001
+            analytical_error = str(exc)
+
+        # Run the real SPICE simulation
+        spice_result = None
+        spice_error = None
+        try:
+            if analysis == "op":
+                spice_result = run_op(spice_params)
+            elif analysis == "ac":
+                spice_result = run_ac(spice_params)
+            elif analysis == "tran":
+                spice_result = run_tran(spice_params)
+        except Exception as exc:  # noqa: BLE001
+            spice_error = str(exc)
+
+        import datetime, os
+        run_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        artifact_path = None
+        try:
+            runs_dir = os.path.join(os.path.dirname(__file__), "docs", "captures")
+            os.makedirs(runs_dir, exist_ok=True)
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            artifact_path = os.path.join(runs_dir, f"spice-{analysis}-{stamp}.txt")
+            with open(artifact_path, "w", encoding="utf-8") as f:
+                f.write(f"analysis: {analysis}\n")
+                f.write(f"timestamp: {run_ts}\n")
+                f.write("\n=== NETLIST ===\n")
+                f.write((spice_result.netlist if spice_result else "") + "\n")
+                f.write("\n=== RUN LOG ===\n")
+                f.write((spice_result.run_log if spice_result else spice_error or "") + "\n")
+        except Exception:
+            artifact_path = None
+
+        return _spice_dashboard(
+            values={k: str(v) for k, v in request.form.items()},
+            errors={},
+            spice_result=spice_result,
+            spice_error=spice_error,
+            analytical_result=analytical_result,
+            analytical_error=analytical_error,
+            analysis=analysis,
+            run_ts=run_ts,
+            run_artifact=artifact_path,
+        )
 
     return app
 

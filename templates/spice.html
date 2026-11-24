@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="dashboard">
+  <!-- ===== COLUMN 1: CIRCUIT & PARAMETERS ===== -->
+  <section class="card input-card">
+    <h2 class="card-title">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M4.8 4.8l2.1 2.1M17.1 17.1l2.1 2.1M19.2 4.8l-2.1 2.1M6.9 17.1l-2.1 2.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      Circuit &amp; Parameters (CE Voltage Divider v1)
+    </h2>
+    <form method="post" action="{{ url_for('spice_run') }}" class="bias-form">
+      <div class="field">
+        <label for="analysis-select">โหมดการวิเคราะห์</label>
+        <div class="input-row">
+          <select id="analysis-select" name="analysis">
+            <option value="op" {% if analysis == "op" %}selected{% endif %}>DC Operating Point (.op)</option>
+            <option value="ac" {% if analysis == "ac" %}selected{% endif %}>AC Analysis (.ac)</option>
+            <option value="tran" {% if analysis == "tran" %}selected{% endif %}>Transient Analysis (.tran)</option>
+          </select>
+        </div>
+      </div>
+
+      {% set spice_fields = [
+        ("vcc", "VCC", "V", "Supply Voltage", "12"),
+        ("rc", "RC", "kΩ", "Collector Resistor", "2.2"),
+        ("r1", "R1", "kΩ", "Upper Divider", "100"),
+        ("r2", "R2", "kΩ", "Lower Divider", "22"),
+        ("re", "RE", "kΩ", "Emitter Resistor", "1"),
+        ("rl", "RL", "kΩ", "Load Resistor", "10"),
+        ("beta", "Beta", "–", "Current Gain", "100"),
+        ("vbe", "VBE", "V", "Base-Emitter Voltage", "0.7"),
+        ("source_ampl", "Source Ampl.", "V", "Input Signal Amplitude", "0.010"),
+        ("source_freq", "Source Freq.", "Hz", "Input Signal Frequency", "1000"),
+      ] %}
+      {% for name, label, unit, description, default in spice_fields %}
+      <div class="field">
+        <label for="{{ name }}">
+          {{ label }}
+          <span class="field-name">({{ description }})</span>
+        </label>
+        <div class="input-row">
+          <input id="{{ name }}" name="{{ name }}" type="text" inputmode="decimal"
+                 autocomplete="off" value="{{ values.get(name, default) }}">
+          <span class="unit-chip">{{ unit }}</span>
+        </div>
+        {% if errors.get(name) %}
+        <p class="error">{{ errors[name] }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <button type="submit">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <rect x="8" y="6" width="8" height="5" rx="1" fill="currentColor"/>
+          <g fill="currentColor">
+            <circle cx="9" cy="15" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="15" cy="15" r="1"/>
+            <circle cx="9" cy="18" r="1"/><circle cx="12" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>
+          </g>
+        </svg>
+        Run SPICE Simulation
+      </button>
+    </form>
+  </section>
+
+  <!-- ===== COLUMN 2: SIMULATION & PLOTS ===== -->
+  <section class="card circuit-card">
+    <h2 class="card-title">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="5" cy="6" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="19" cy="6" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="18" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M7 7l3.6 8.6M17 7l-3.6 8.6M7.2 6h9.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      Simulation &amp; Plots
+    </h2>
+
+    {% if spice_error %}
+    <div class="callout callout-saturation" style="margin-bottom: 1rem;">
+      <div>
+        <strong>SPICE Engine Error</strong>
+        <p>{{ spice_error }}</p>
+      </div>
+    </div>
+    {% elif spice_result %}
+      <p class="section-label"><span class="provenance provenance-spice">SPICE Simulation Results (ngspice)</span></p>
+      {% if analysis == "op" %}
+      <img class="spice-plot" src="{{ plot_op_bars(spice_result) }}" alt="DC Operating Point bar chart from ngspice .op">
+      {% elif analysis == "ac" %}
+      <img class="spice-plot" src="{{ plot_ac_response(spice_result.frequency, spice_result.gain_db, spice_result.phase_deg) }}" alt="AC Bode plot from ngspice .ac">
+      {% elif analysis == "tran" %}
+      <img class="spice-plot" src="{{ plot_tran_waveforms(spice_result.time, spice_result.vin, spice_result.vout) }}" alt="Transient waveform from ngspice .tran">
+      {% endif %}
+
+      <p class="section-label">Netlist (generated for this run)</p>
+      <pre class="netlist-block">{{ spice_result.netlist }}</pre>
+    {% else %}
+    <p class="placeholder">Configure parameters and click Run SPICE Simulation.</p>
+    {% endif %}
+  </section>
+
+  <!-- ===== COLUMN 3: ENGINEERING RESULTS ===== -->
+  <section class="card results-card">
+    <h2 class="card-title">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="12" width="4" height="8" rx="1" fill="currentColor"/>
+        <rect x="10" y="7" width="4" height="13" rx="1" fill="currentColor"/>
+        <rect x="16" y="3" width="4" height="17" rx="1" fill="currentColor"/>
+      </svg>
+      Engineering Results
+    </h2>
+
+    {% if spice_result and analysis == "op" %}
+    <div class="callout callout-active" style="margin-bottom: 1rem;">
+      <div>
+        <span class="provenance provenance-spice">SPICE Simulation Results (ngspice)</span>
+        <strong style="display:block;">DC Operating Point — .op</strong>
+        <table class="results" style="margin-top: 0.5rem;">
+          <tbody>
+            <tr><th scope="row">VB</th><td>{{ "%.4f"|format(spice_result.vb) }} V</td></tr>
+            <tr><th scope="row">VE</th><td>{{ "%.4f"|format(spice_result.ve) }} V</td></tr>
+            <tr><th scope="row">VC</th><td>{{ "%.4f"|format(spice_result.vc) }} V</td></tr>
+            <tr><th scope="row">VCE</th><td>{{ "%.4f"|format(spice_result.vce) }} V</td></tr>
+            <tr><th scope="row">IC</th><td>{{ "%.4f"|format(spice_result.ic * 1e3) }} mA</td></tr>
+            <tr><th scope="row">IB</th><td>{{ "%.4f"|format(spice_result.ib * 1e6) }} µA</td></tr>
+            <tr><th scope="row">IE</th><td>{{ "%.4f"|format(spice_result.ie * 1e3) }} mA</td></tr>
+            <tr><th scope="row">Region</th><td>{{ spice_result.region }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if analytical_result and analysis == "op" %}
+    <div class="callout callout-active" style="margin-bottom: 1rem;">
+      <div>
+        <span class="provenance provenance-analytical">DC Analytical Results (dc_bias.py)</span>
+        <strong style="display:block;">DC Operating Point — Analytical</strong>
+        <table class="results" style="margin-top: 0.5rem;">
+          <tbody>
+            <tr><th scope="row">VB</th><td>{{ "%.4f"|format(analytical_result.vb) }} V</td></tr>
+            <tr><th scope="row">VE</th><td>{{ "%.4f"|format(analytical_result.ve) }} V</td></tr>
+            <tr><th scope="row">VC</th><td>{{ "%.4f"|format(analytical_result.vc) }} V</td></tr>
+            <tr><th scope="row">VCE</th><td>{{ "%.4f"|format(analytical_result.vce) }} V</td></tr>
+            <tr><th scope="row">IC</th><td>{{ "%.4f"|format(analytical_result.ic * 1e3) }} mA</td></tr>
+            <tr><th scope="row">Region</th><td>{{ analytical_result.region }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if spice_result and analytical_result and analysis == "op" %}
+    <div class="callout callout-active" style="margin-bottom: 1rem;">
+      <div>
+        <strong>Compare + Warnings — SPICE vs Analytical (DC only)</strong>
+        <table class="compare" style="margin-top: 0.5rem;">
+          <thead>
+            <tr><th>Quantity</th><th>SPICE (ngspice)</th><th>Analytical (dc_bias.py)</th><th>Difference</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">VCE</th>
+              <td>{{ "%.4f"|format(spice_result.vce) }} V</td>
+              <td>{{ "%.4f"|format(analytical_result.vce) }} V</td>
+              <td>{{ "%.4f"|format((spice_result.vce - analytical_result.vce)) }} V</td>
+            </tr>
+            <tr>
+              <th scope="row">IC</th>
+              <td>{{ "%.4f"|format(spice_result.ic * 1e3) }} mA</td>
+              <td>{{ "%.4f"|format(analytical_result.ic * 1e3) }} mA</td>
+              <td>{{ "%.4f"|format((spice_result.ic - analytical_result.ic) * 1e3) }} mA</td>
+            </tr>
+            <tr>
+              <th scope="row">VB</th>
+              <td>{{ "%.4f"|format(spice_result.vb) }} V</td>
+              <td>{{ "%.4f"|format(analytical_result.vb) }} V</td>
+              <td>{{ "%.4f"|format((spice_result.vb - analytical_result.vb)) }} V</td>
+            </tr>
+          </tbody>
+        </table>
+        {% if analytical_result.region != spice_result.region %}
+        <p class="error" style="margin-top: 0.5rem;"><strong>Warning:</strong> Region mismatch — SPICE says {{ spice_result.region }}, Analytical says {{ analytical_result.region }}.</p>
+        {% else %}
+        <p style="margin-top: 0.5rem; color: var(--muted);">Regions agree: {{ spice_result.region }}.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if analysis != "op" %}
+    <div class="callout callout-saturation" style="margin-bottom: 1rem;">
+      <div>
+        <strong>Compare + Warnings</strong>
+        <p>การเปรียบเทียบกับ dc_bias.py (Analytical) ทำได้เฉพาะโหมด DC (.op) ที่มีสมมติฐานสอดคล้องกันเท่านั้น ไม่เปรียบเทียบในโหมด AC/Transient</p>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if spice_error %}
+    <div class="callout callout-cutoff">
+      <div>
+        <strong>Engine status:</strong> ngspice run failed — {{ spice_error }}
+        {% if run_artifact %}<div style="font-size:0.8rem; color:var(--muted); margin-top:0.2rem;">Saved run: {{ run_artifact }}</div>{% endif %}
+      </div>
+    </div>
+    {% elif spice_result %}
+    <div class="callout callout-active">
+      <div>
+        <strong>Engine status:</strong> ngspice OK — {{ analysis }} analysis completed{% if run_ts %} ({{ run_ts }}){% endif %}
+        {% if run_artifact %}<div style="font-size:0.8rem; color:var(--muted); margin-top:0.2rem;">Saved run: {{ run_artifact }}</div>{% endif %}
+      </div>
+    </div>
+    <details style="margin-top:0.6rem;">
+      <summary style="cursor:pointer; font-weight:600; color:var(--muted);">Run log (ngspice stdout)</summary>
+      <pre class="netlist-block" style="margin-top:0.4rem;">{{ spice_result.run_log }}</pre>
+    </details>
+    {% endif %}
+
+    {% if analytical_error %}
+    <div class="callout callout-cutoff">
+      <div>
+        <strong>Analytical error:</strong> {{ analytical_error }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not spice_result and not spice_error and not analytical_result and not analytical_error %}
+    <p class="placeholder">Results will appear here after running SPICE simulation.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
