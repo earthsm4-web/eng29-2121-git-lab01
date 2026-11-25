@@ -79,7 +79,7 @@ Full CE-lab file:
 38 passed in 1.95s
 ```
 
-## Full suite (run once)
+## Full suite (post-fix, run once)
 
 Command (exact):
 
@@ -90,7 +90,7 @@ Command (exact):
 Exact final summary line:
 
 ```
-5 failed, 87 passed in 1.93s
+5 failed, 88 passed in 1.76s
 ```
 
 The five failures are the same pre-existing `tests/test_routes.py`
@@ -100,8 +100,11 @@ assertion failures reported by the controller at baseline:
 `test_schematic_reports_the_saturation_qpoint`,
 `test_schematic_reports_the_cutoff_qpoint`,
 `test_index_renders_the_dashboard_with_defaults`.
-Baseline was `5 failed, 80 passed`; the seven added tests account for
-`87 passed`. No new failures and no collection errors.
+Baseline was `5 failed, 80 passed`; the eight added tests (seven from the
+original Task 3 run plus the Fix round 1 covering test) account for
+`88 passed`. The pre-fix Task 3 line was `5 failed, 87 passed` (controller
+reported `5 failed, 87 passed in 1.86s`); the line above is the real post-fix
+line. No new failures and no collection errors.
 
 ## Files changed
 
@@ -116,9 +119,13 @@ Baseline was `5 failed, 80 passed`; the seven added tests account for
 - Dispatch uses module-level `run_op` / `run_ac` / `run_tran` lookups, so
   `monkeypatch.setattr(app_module, "run_ac", ...)` intercepts the call made by
   the route. No direct ngspice invocation was added to `app.py`.
-- One `try` wraps engine call, metric derivation, and plot generation. Any
-  failure resets every result/metric/plot field, so no stale success markup can
-  render on that response.
+- Separate `try` blocks: one around engine dispatch (catching
+  `SpiceEngineError` separately from unexpected dispatch errors) and one
+  around metric derivation + plot generation. Every failure path resets all
+  result/metric/plot fields, so no stale success markup can render on that
+  response. Engine failures are prefixed `ngspice run failed:`;
+  metric/plot failures are prefixed
+  `CE lab processing error after ngspice run:`.
 - Validation happens before `SpiceParams` construction and before any engine
   call; the invalid response returns 400 with field errors only.
 - Template success markup is gated by `{% if spice_result %}`; the data URI is
@@ -146,3 +153,101 @@ Baseline was `5 failed, 80 passed`; the seven added tests account for
    state.
 3. The five full-suite failures are pre-existing and confined to
    `tests/test_routes.py`; they were not touched.
+
+## Fix round 1
+
+### Finding
+
+Important — `app.py:363` + `templates/ce_lab.html:47,50`: the broad
+`except Exception` also caught errors from `ac_summary`, `tran_summary`, and
+`plot_*`, but the template labeled every such failure "SPICE Engine Error" /
+"ngspice run failed". A plotting or metric-derivation bug after a successful
+ngspice run would falsely implicate the engine, weakening the project's
+provenance guarantee.
+
+### Code change
+
+- `app.py`: imported `SpiceEngineError` and split the error handling into two
+  stages.
+  - Engine dispatch (`run_op` / `run_ac` / `run_tran`) catches
+    `SpiceEngineError` separately and prefixes the message with
+    `ngspice run failed:`. An unexpected non-engine dispatch exception is
+    caught with the neutral prefix `CE lab run error:`.
+  - Metric derivation and plot generation (`ac_summary` / `tran_summary` /
+    `plot_*`) run in a separate `try` only after a successful engine result.
+    Any failure there is prefixed
+    `CE lab processing error after ngspice run:`.
+  - Every failure path sets `spice_result=None`, `ac_metrics=None`,
+    `tran_metrics=None`, and `plot_uri=None`, so no success badge, tables, or
+    base64 image can render.
+- `templates/ce_lab.html`: error card heading changed from
+  `SPICE Engine Error` to the neutral `CE Lab Error`; the hard-coded
+  `ngspice run failed` strong label was replaced with
+  `Run could not be completed`, and the exact `spice_error` string (which now
+  carries the stage-specific prefix) is still shown verbatim in `<pre>`.
+
+### Covering tests
+
+- New: `test_ce_lab_run_processing_error_does_not_blame_engine` — patches
+  `app.run_ac` to return a real-shaped `SpiceAcResult`, patches
+  `app.ac_summary` to raise, POSTs the AC form, and asserts the page contains
+  `CE lab processing error after ngspice run:` plus the metric error token,
+  while containing neither `ngspice run failed`, `SPICE (ngspice)`,
+  `SPICE SIMULATION RESULTS (NGSPICE)`, nor a base64 `<img>`.
+- Kept/strengthened:
+  `test_ce_lab_run_engine_error_renders_log_without_stale_success` — the
+  engine-raised `SpiceEngineError` path still shows the real log token and now
+  also asserts `ngspice run failed` is present.
+- Existing dispatch and validation tests remain unchanged and passing.
+
+### RED evidence (new test before fix)
+
+Command (exact):
+
+```
+.venv\Scripts\python -m pytest tests_spice/test_ce_lab.py -k "dispatch or error" -v
+```
+
+Exact summary:
+
+```
+1 failed, 10 passed, 28 deselected in 1.28s
+```
+
+The failure was the new test: the old broad handler rendered
+`metric derivation exploded: metric-token-ABC` under the hard-coded
+`ngspice run failed` / `SPICE Engine Error` markup, so the distinct
+processing-error string was absent.
+
+### GREEN evidence (after fix)
+
+Command (exact):
+
+```
+.venv\Scripts\python -m pytest tests_spice/test_ce_lab.py -k "dispatch or error" -v
+```
+
+Exact summary:
+
+```
+11 passed, 28 deselected in 1.16s
+```
+
+### Full suite after fix (run once)
+
+Command (exact):
+
+```
+.venv\Scripts\python -m pytest -q
+```
+
+Exact final summary line:
+
+```
+5 failed, 88 passed in 1.76s
+```
+
+Only the five pre-existing `tests/test_routes.py` assertion failures remain;
+the engine-error and processing-error paths now render distinct provenance-safe
+messages.
+
