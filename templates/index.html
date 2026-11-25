@@ -13,8 +13,6 @@
     </h2>
 
     <form method="post" action="{{ url_for('calculate') }}" class="bias-form">
-      <input type="hidden" name="mode" value="{{ mode }}">
-
       <div class="field">
         <label for="mode-select">โหมดวงจร</label>
         <div class="input-row">
@@ -26,15 +24,9 @@
         </div>
       </div>
 
-      {% set mode_fields = {
-        "fixed": ["vcc", "rb", "rc", "beta", "vbe"],
-        "emitter": ["vcc", "rb", "re", "rc", "beta", "vbe"],
-        "divider": ["vcc", "r1", "r2", "rc", "re", "beta", "vbe"],
-      } %}
-      {% set active_fields = mode_fields.get(mode, mode_fields["divider"]) %}
-
+      {# All mode fields ship in the DOM; toggleFields() below hides the ones
+         that do not belong to the selected mode. #}
       {% for name, label, unit, description in fields %}
-      {% if name in active_fields %}
       <div class="field" data-field="{{ name }}">
         <label for="{{ name }}">
           {% if name == "beta" %}β{% else %}{{ label[0] }}<sub>{{ label[1:] }}</sub>{% endif %}
@@ -55,7 +47,6 @@
         <p class="error">{{ errors[name] }}</p>
         {% endif %}
       </div>
-      {% endif %}
       {% endfor %}
 
       <button type="submit">

@@ -27,6 +27,7 @@ CE_LAB_DEFAULTS = dict(SPICE_DEFAULTS)
 
 FIELDS = [
     ("vcc", "VCC", "V", "Supply Voltage"),
+    ("rb", "RB", "kΩ", "Base Resistor"),
     ("r1", "R1", "kΩ", "Upper Divider"),
     ("r2", "R2", "kΩ", "Lower Divider"),
     ("rc", "RC", "kΩ", "Collector Resistor"),
@@ -66,6 +67,17 @@ def _dashboard(values, errors=None, params=None) -> str:
             else None
         )
 
+    # On validation errors there is no solved params object, but the form must
+    # stay in the mode the user selected (and keep showing that mode's errors).
+    submitted_mode = values.get("mode") if values else None
+    mode = (
+        params.mode
+        if params
+        else submitted_mode
+        if submitted_mode in ("fixed", "emitter", "divider")
+        else "divider"
+    )
+
     return render_template(
         "index.html",
         values=values,
@@ -77,7 +89,7 @@ def _dashboard(values, errors=None, params=None) -> str:
         comparison=comparison,
         quantities=QUANTITIES,
         compare_keys=COMPARE_KEYS,
-        mode=params.mode if params else "divider",
+        mode=mode,
     )
 
 

@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 .superpowers/
 .playwright-mcp/
+
+# Raw ngspice run logs are generated on every /spice run. Only the specific
+# evidence logs cited in docs/validation.md are tracked; ignore new ones.
+docs/captures/spice-*.txt

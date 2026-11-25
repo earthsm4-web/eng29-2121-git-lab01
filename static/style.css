@@ -527,7 +527,7 @@ table.compare tbody tr:nth-child(even) {
 
 @media (max-width: 1100px) {
   .dashboard {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .results-card {
@@ -546,7 +546,7 @@ table.compare tbody tr:nth-child(even) {
   }
 
   .dashboard {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .results-card {
@@ -642,7 +642,7 @@ table.compare tbody tr:nth-child(even) {
 .result-table th { color: var(--muted); font-weight: 600; width: 35%; }
 .spice-plot { width: 100%; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); }
 .section-label { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 0.8rem 0 0.3rem; }
-@media (max-width: 1100px) { .dashboard { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .dashboard { grid-template-columns: minmax(0, 1fr); } }
 
 /* ==========================================================================
    Lab 4 Task 5 — Accessible CE lab tabs, scoped styling, responsive motion
