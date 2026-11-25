@@ -700,3 +700,25 @@ def test_tran_netlist_uses_ngspice_tstep_tstop_order():
     assert tstop >= 2.0 / params.source_freq, (
         "transient window must cover at least two source cycles"
     )
+
+
+def test_ce_lab_full_width_override_is_scoped():
+    """Only the CE-lab page drops the shared 78rem width cap."""
+    from pathlib import Path
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+
+    assert "body:has(.ce-lab-grid) .page" in css
+    assert re.search(
+        r"body:has\(\.ce-lab-grid\) \.page\s*\{\s*max-width:\s*none", css
+    ), "CE-lab width override must set max-width: none"
+    assert re.search(r"\.page\s*\{\s*max-width:\s*78rem", css), (
+        "shared .page cap must remain for other pages"
+    )
+
+    client = app_module.create_app().test_client()
+    for path in ("/", "/spice"):
+        assert "ce-lab-grid" not in client.get(path).data.decode(), (
+            f"{path} must not contain the CE-lab grid"
+        )

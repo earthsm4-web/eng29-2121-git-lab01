@@ -649,6 +649,10 @@ table.compare tbody tr:nth-child(even) {
    Scoped additions only. Shared tokens and rules above are left untouched.
    ========================================================================== */
 
+/* Full-width dashboard: only pages containing the CE-lab grid opt out of
+   the shared .page cap (the user views this page on a wide monitor). */
+body:has(.ce-lab-grid) .page { max-width: none; }
+
 .ce-lab-grid {
   --ce-navy: #10233a;
   --ce-navy-soft: #e8eef6;
