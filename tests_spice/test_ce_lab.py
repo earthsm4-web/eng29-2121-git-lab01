@@ -90,3 +90,64 @@ def test_tran_summary_raises_on_zero_freq():
     )
     with pytest.raises(ValueError):
         tran_summary(result, 0.0)
+
+
+def test_tran_summary_short_record_raises_valueerror():
+    # Two cycles at 1000 Hz = 2ms window, but record only has 0.0001s
+    result = SpiceTranResult(
+        time=[0.0, 0.0001],
+        vin=[1.0, 2.0],
+        vout=[1.0, 2.0],
+        netlist="",
+        run_log="",
+    )
+    with pytest.raises(ValueError):
+        tran_summary(result, 1000.0)
+
+
+def test_tran_summary_empty_time_raises_valueerror():
+    result = SpiceTranResult(
+        time=[],
+        vin=[1.0],
+        vout=[1.0],
+        netlist="",
+        run_log="",
+    )
+    with pytest.raises(ValueError):
+        tran_summary(result, 1000.0)
+
+
+def test_tran_summary_empty_vin_raises_valueerror():
+    result = SpiceTranResult(
+        time=[0.0, 0.001],
+        vin=[],
+        vout=[1.0],
+        netlist="",
+        run_log="",
+    )
+    with pytest.raises(ValueError):
+        tran_summary(result, 1000.0)
+
+
+def test_tran_summary_empty_vout_raises_valueerror():
+    result = SpiceTranResult(
+        time=[0.0, 0.001],
+        vin=[1.0, 2.0],
+        vout=[],
+        netlist="",
+        run_log="",
+    )
+    with pytest.raises(ValueError):
+        tran_summary(result, 1000.0)
+
+
+def test_tran_summary_mismatched_lengths_raises_valueerror():
+    result = SpiceTranResult(
+        time=[0.0, 0.001, 0.002],
+        vin=[1.0, 2.0],
+        vout=[1.0, 2.0, 3.0, 4.0],
+        netlist="",
+        run_log="",
+    )
+    with pytest.raises(ValueError):
+        tran_summary(result, 1000.0)
