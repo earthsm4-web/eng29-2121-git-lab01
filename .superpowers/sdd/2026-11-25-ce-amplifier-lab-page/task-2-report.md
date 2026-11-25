@@ -22,29 +22,29 @@ Implemented Task 2 as specified in the brief. Changes included:
 4. **`tests_spice/test_ce_lab.py`** (modified):
    - Added `test_ce_lab_get_renders_skeleton` — GET /ce-lab returns 200, contains "CE Amplifier Lab", has `name="analysis"`, no "SPICE SIMULATION RESULTS (NGSPICE)" in HTML
    - Added `test_ce_lab_nav_links` — rendered HTML contains nav links to `/`, `/spice`, and `/ce-lab`
-   - Added 11 parametrized boundary validation tests (`test_parse_spice_form_bounds`):
-     - `beta=1` passes (inclusive lower bound); `beta=0` fails
-     - `vbe=0.1` and `vbe=2.0` pass (inclusive 0.1–2.0); `vbe=0.01` fails
-     - `source_ampl=1.0` passes (>0 and ≤1 V); `source_ampl=0` fails
-     - `source_freq=1` and `source_freq=1e6` pass (inclusive 1–1MHz); `source_freq=1e7` fails
+   - Added 11 parametrized `test_parse_spice_form_bounds` tests:
+     - `beta=1` passes (inclusive lower bound); `beta=0` fails with "Beta must be greater than or equal to 1.0"
+     - `vbe=0.1` and `vbe=2.0` pass (inclusive 0.1–2.0); `vbe=0.01` fails with "VBE must be greater than or equal to 0.1"
+     - `source_ampl=1.0` passes (>0 and ≤1 V); `source_ampl=0` fails with "Source amplitude must be greater than 0.0"
+     - `source_freq=1` and `source_freq=1e6` pass (inclusive 1–1MHz); `source_freq=1e7` fails with "Source frequency must be less than or equal to 1000000.0"
      - `rc=0` fails (strict >0 kΩ); `rc=0.001` passes
-   - Added `test_parse_spice_form_valid` assertions for `source_ampl="0.010"` → `0.01`, and corroborated `source_freq`/`beta`/`vbe` passthrough
+   - Added `source_ampl="0.010"` → `0.01` assertion and corroborated `source_freq`/`beta`/`vbe` passthrough to `test_parse_spice_form_valid`
 
 ## Test Results
 
 Full suite run (with pytest from repo root):
 ```
-5 failed, 66 passed in 0.97s
+5 failed, 80 passed in 0.74s
 ```
 
-The 5 failures are the same pre-existing assertion failures in `tests/test_routes.py`; no new failures introduced. The 7 new Task 2 tests (route skeleton, nav links, 11 boundary validation tests, valid-form assertions) all pass.
+The 5 failures are the same pre-existing assertion failures in `tests/test_routes.py`; all `tests_spice/test_ce_lab.py` tests pass. No new failures were introduced.
 
-Prior controller baseline: `5 failed, 59 passed`. Delta: +7 new tests (route skeleton + nav + 11 boundary validation + valid-form assertions minus some overlap; net +7 new passing tests).
+Prior controller baseline (before these fixes): `5 failed, 66 passed in 0.97s`. Delta: +14 passing tests (from 66 to 80).
 
 ## Fix round 1
 
 1. **Missing route tests** — Added `test_ce_lab_get_renders_skeleton` and `test_ce_lab_nav_links` to `tests_spice/test_ce_lab.py`; both pass.
-2. **Inclusive lower bounds not honored** — Fixed `app.py:152` to use `value < lo` for beta/ vbe/ source_freq (inclusive ≥ lo) and keep `value <= lo` (strict >0) for vcc/rc/r1/re/rl/source_amp; added 11 boundary parametrized tests `test_parse_spice_form_bounds` covering beta=1, vbe=0.1/2.0, source_ampl=1.0, source_freq=1/1e6, rc=0 — all pass.
+2. **Inclusive lower bounds not honored** — Fixed `app.py` bound checks to use `value < lo` for beta/ vbe/ source_freq (inclusive ≥ lo) and `value <= lo` (strict >0) for vcc/rc/r1/re/rl/source_amp; added 11 boundary parametrized tests `test_parse_spice_form_bounds` covering all specified boundary cases — all pass.
 3. **Wrong units on `/ce-lab` for RC** — Changed `ce_lab` route to pass raw `CE_LAB_DEFAULTS` (kΩ units) to `_ce_lab_dashboard` instead of SI-converted values; template now renders `2.2 kΩ` for RC.
 4. **Missing valid-form assertion** — Added `assert result_values["source_ampl"] == 0.01` (and corroborated `source_freq`/`beta`/`vbe` passthrough) to `test_parse_spice_form_valid` in `tests_spice/test_ce_lab.py`; all pass.
 5. **Report line 9 correction** — Removed false claim that `_parse_spice_form` is a delegating wrapper inside `create_app()`; the wrapper was deleted and the module-level `parse_spice_form` is used directly.
