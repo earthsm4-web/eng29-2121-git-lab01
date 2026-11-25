@@ -231,12 +231,24 @@ submission; no JavaScript errors were observed.
 
 | Viewport | `grid-template-columns` | Column widths | Horizontal overflow |
 |----------|-------------------------|---------------|---------------------|
-| 1280 px | `410.703px 391.141px 391.156px` | 411 / 391 / 391 px, all on one row | none (`scrollWidth` 1265) |
-| 820 px | `776.219px` | 776 px, stacked | none |
-| 390 px | stacked single column | 346 px | none |
+| 1440 px | `465.781px 443.609px 443.609px` | 466 / 444 / 444 px, all on one row; `Analysis Workbench` at `x=502, y=155` beside `Circuit & Parameters` | none (`scrollWidth` 1425) |
+| 1280 px | `410.703px 391.141px 391.156px` | 411 / 391 / 391 px, all on one row; workbench at `x=447, y=155` | none (`scrollWidth` 1265) |
+| 820 px | `776.219px` | 776 px, stacked | none (`scrollWidth` 805) |
+| 390 px | stacked single column | 346 px; `clipped=[]` | none (`scrollWidth` 375) |
 
-Screenshots: `docs/captures/ce-lab-1280.png`, `docs/captures/ce-lab-820.png`,
-`docs/captures/ce-lab-390.png`.
+Screenshots: `docs/captures/ce-lab-1440.png`, `docs/captures/ce-lab-1280.png`,
+`docs/captures/ce-lab-820.png`, `docs/captures/ce-lab-390.png`.
+
+Stale-build audit (2026-11-25): both local Flask processes (ports 5000 and
+5001) were started from this repo and serve the same `static/style.css`
+(SHA-256 `6E197B96F72223C3CBD39F543051D1A60620F30E8049806B26577A0717FB7938`).
+There is only one `style.css` under `C:\Users\ASUS` and no git worktree. Flask
+returns `Cache-Control: no-cache` plus an ETag, and a fresh fetch still contains
+`body:has(.ce-lab-grid) .page { max-width: none; }` and the three-column
+`.ce-lab-grid` rule. The in-app browser at 1000 px also shows two columns with
+the workbench beside the sidebar. No narrow-left-column/empty-right defect is
+present on `b5563e4`; if it remains visible, check browser zoom and the actual
+`innerWidth` at the viewing surface.
 
 ## Test suite
 
