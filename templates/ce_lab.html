@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>CE Amplifier Lab</h2>
+  <form method="get">
+    <input type="hidden" name="analysis" value="op">
+    <div class="form-group">
+      <label>VCC (V)</label>
+      <input name="vcc" type="number" step="any" value="{{ values.get('vcc', '') }}">
+    </div>
+    <div class="form-group">
+      <label>RC (kΩ)</label>
+      <input name="rc" type="number" step="any" value="{{ values.get('rc', '') }}">
+    </div>
+    <div class="form-group">
+      <label>Source amplitude (V)</label>
+      <input name="source_ampl" type="number" step="any" value="{{ values.get('source_ampl', '') }}">
+    </div>
+    <div class="form-group">
+      <label>Source frequency (Hz)</label>
+      <input name="source_freq" type="number" step="any" value="{{ values.get('source_freq', '') }}">
+    </div>
+    <button type="submit">Run Simulation</button>
+  </form>
+  {% if result is defined %}<div class="result">{{ result }}</div>{% endif %}
+{% endblock %}

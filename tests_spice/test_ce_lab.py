@@ -151,3 +151,50 @@ def test_tran_summary_mismatched_lengths_raises_valueerror():
     )
     with pytest.raises(ValueError):
         tran_summary(result, 1000.0)
+
+
+# ---------------------------------------------------------------------------
+# parse_spice_form validation tests
+# ---------------------------------------------------------------------------
+
+import pytest
+
+from app import parse_spice_form
+
+
+@pytest.mark.parametrize(
+    "field, value, expected_error_substring",
+    [
+        ("source_ampl", "0", "Source amplitude must be greater than 0"),
+        ("source_freq", "1e7", "Source frequency must be less than or equal to 1000000.0"),
+        ("rc", "-1", "RC must be greater than 0"),
+        ("vbe", "0.01", "VBE must be greater than 0.1"),
+        ("beta", "0", "Beta must be greater than 1"),
+        ("vcc", "abc", "VCC must be a number"),
+    ],
+)
+def test_parse_spice_form_invalid(field, value, expected_error_substring):
+    form = {
+        "vcc": "12", "rc": "2.2", "r1": "100", "r2": "22", "re": "1",
+        "rl": "10", "beta": "100", "vbe": "0.7",
+        "source_ampl": "0.010", "source_freq": "1000",
+    }
+    form[field] = value
+    result_values, errors = parse_spice_form(form)
+    assert result_values is None
+    assert field in errors
+    assert expected_error_substring in errors[field]
+
+
+def test_parse_spice_form_valid():
+    form = {
+        "vcc": "12", "rc": "2.2", "r1": "100", "r2": "22", "re": "1",
+        "rl": "10", "beta": "100", "vbe": "0.7",
+        "source_ampl": "0.010", "source_freq": "1000",
+    }
+    result_values, errors = parse_spice_form(form)
+    assert result_values is not None
+    assert errors == {}
+    # kΩ → Ω conversion: rc and r1 are the resistances that get converted
+    assert result_values["rc"] == 2200.0
+    assert result_values["r1"] == 100000.0

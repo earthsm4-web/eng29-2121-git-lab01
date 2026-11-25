@@ -22,6 +22,8 @@ SPICE_DEFAULTS = {
     "source_ampl": "0.010", "source_freq": "1000",
 }
 
+CE_LAB_DEFAULTS = dict(SPICE_DEFAULTS)
+
 FIELDS = [
     ("vcc", "VCC", "V", "Supply Voltage"),
     ("r1", "R1", "kΩ", "Upper Divider"),
@@ -105,6 +107,71 @@ def _spice_dashboard(values=None, errors=None, spice_result=None,
     )
 
 
+def parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
+    """Parse and validate SPICE form inputs (kΩ, V, Hz units).
+
+    Returns (values_in_SI, {}) or (None, errors).
+    Bounds (validated before netlist creation):
+      - resistances > 0 kΩ
+      - beta ≥ 1
+      - VBE 0.1–2 V
+      - source amplitude > 0 and ≤ 1 V
+      - source frequency 1 Hz–1 MHz
+      - VCC > 0 V
+    Parse finite numbers only. Convert kΩ→Ω after validation.
+    """
+    errors: dict[str, str] = {}
+    values: dict[str, float] = {}
+
+    numeric_fields = {
+        "vcc": ("VCC", 0.0, None),
+        "rc": ("RC", 0.0, None),
+        "r1": ("R1", 0.0, None),
+        "r2": ("R2", 0.0, None),
+        "re": ("RE", 0.0, None),
+        "rl": ("RL", 0.0, None),
+        "beta": ("Beta", 1.0, None),
+        "vbe": ("VBE", 0.1, 2.0),
+        "source_ampl": ("Source amplitude", 0.0, 1.0),
+        "source_freq": ("Source frequency", 1.0, 1_000_000.0),
+    }
+
+    for field, (label, lo, hi) in numeric_fields.items():
+        raw = (form.get(field) or "").strip()
+        if not raw:
+            errors[field] = f"{label} is required"
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            errors[field] = f"{label} must be a number"
+            continue
+        if not math.isfinite(value):
+            errors[field] = f"{label} must be a number"
+            continue
+        if lo is not None and value <= lo:
+            errors[field] = f"{label} must be greater than {lo}"
+            continue
+        if hi is not None and value > hi:
+            errors[field] = f"{label} must be less than or equal to {hi}"
+            continue
+        values[field] = value
+
+    if errors:
+        return None, errors
+
+    # Convert kΩ → Ω for resistances
+    for field in ("rc", "r1", "r2", "re", "rl"):
+        values[field] *= 1000.0
+
+    return values, {}
+
+
+def _parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
+    """Delegate to module-level parse_spice_form."""
+    return parse_spice_form(form)
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.add_template_filter(fmt_v, "v")
@@ -125,54 +192,6 @@ def create_app() -> Flask:
             return _dashboard(request.form, errors=errors), 400
         return _dashboard(request.form, params=params)
 
-    def _parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
-        """Parse and validate SPICE form inputs (kΩ, V, Hz units).
-
-        Returns (values_in_SI, {}) or (None, errors).
-        """
-        errors: dict[str, str] = {}
-        values: dict[str, float] = {}
-
-        numeric_fields = {
-            "vcc": ("VCC", 0.0, None),
-            "rc": ("RC", 0.0, None),
-            "r1": ("R1", 0.0, None),
-            "r2": ("R2", 0.0, None),
-            "re": ("RE", 0.0, None),
-            "rl": ("RL", 0.0, None),
-            "beta": ("Beta", 1.0, None),
-            "vbe": ("VBE", 0.0, None),
-            "source_ampl": ("Source amplitude", 0.0, None),
-            "source_freq": ("Source frequency", 0.0, None),
-        }
-
-        for field, (label, lo, hi) in numeric_fields.items():
-            raw = (form.get(field) or "").strip()
-            if not raw:
-                errors[field] = f"{label} is required"
-                continue
-            try:
-                value = float(raw)
-            except ValueError:
-                errors[field] = f"{label} must be a number"
-                continue
-            if not math.isfinite(value):
-                errors[field] = f"{label} must be a number"
-                continue
-            if lo is not None and value <= lo:
-                errors[field] = f"{label} must be greater than {lo}"
-                continue
-            values[field] = value
-
-        if errors:
-            return None, errors
-
-        # Convert kΩ → Ω for resistances
-        for field in ("rc", "r1", "r2", "re", "rl"):
-            values[field] *= 1000.0
-
-        return values, {}
-
     @app.get("/spice")
     def spice_index():
         return _spice_dashboard(values=_spice_defaults(), analysis="op")
@@ -183,7 +202,7 @@ def create_app() -> Flask:
         if analysis not in ("op", "ac", "tran"):
             analysis = "op"
 
-        values, errors = _parse_spice_form(request.form)
+        values, errors = parse_spice_form(request.form)
         if errors:
             return _spice_dashboard(
                 values=request.form, errors=errors, analysis=analysis
@@ -259,6 +278,19 @@ def create_app() -> Flask:
             analysis=analysis,
             run_ts=run_ts,
             run_artifact=artifact_path,
+        )
+
+    @app.get("/ce-lab")
+    def ce_lab():
+        values, _ = parse_spice_form(CE_LAB_DEFAULTS)
+        return _ce_lab_dashboard(values=values, analysis="op")
+
+    def _ce_lab_dashboard(values=None, analysis="op") -> str:
+        """Render the CE lab dashboard skeleton."""
+        return render_template(
+            "ce_lab.html",
+            values=values or CE_LAB_DEFAULTS,
+            analysis=analysis,
         )
 
     return app
