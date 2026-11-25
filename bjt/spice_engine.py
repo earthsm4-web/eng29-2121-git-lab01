@@ -140,7 +140,9 @@ def _build_netlist(p: SpiceParams, analysis: str) -> str:
         tstop = 5.0 / p.source_freq if p.source_freq > 0 else 0.005
         tstep = tstop / 1000.0
         lines.extend([
-            ".tran {tstop} {tstep}".format(tstop=tstop, tstep=tstep),
+            # ngspice reads `.tran TSTEP TSTOP`; swapping them truncates the
+            # run to TSTEP seconds and breaks the two-cycle analysis window.
+            ".tran {tstep} {tstop}".format(tstep=tstep, tstop=tstop),
             ".print tran v(2) v(6)",
         ])
     else:

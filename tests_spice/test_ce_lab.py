@@ -676,3 +676,27 @@ def test_ce_lab_tabs_javascript_controller_source():
     assert "form.submit" not in js
     assert "addEventListener" in js
     assert "DOMContentLoaded" in js or "readyState" in js
+
+
+def test_tran_netlist_uses_ngspice_tstep_tstop_order():
+    """ngspice reads `.tran TSTEP TSTOP`; a swapped pair truncates the run.
+
+    Regression for the browser-accepted Transient tab: with the arguments
+    swapped, default 1 kHz input produced a 5 us run and `tran_summary`
+    rejected the record as shorter than two source cycles.
+    """
+    from bjt.spice_engine import SpiceParams, _build_netlist
+
+    params = SpiceParams(
+        vcc=12, rc=2200, r1=100000, r2=22000, re=1000, rl=10000,
+        beta=100, vbe=0.7, source_ampl=0.01, source_freq=1000,
+    )
+    netlist = _build_netlist(params, "tran")
+    match = re.search(r"^\.tran\s+(\S+)\s+(\S+)\s*$", netlist, re.MULTILINE)
+    assert match, "no .tran directive in generated netlist"
+
+    tstep, tstop = float(match.group(1)), float(match.group(2))
+    assert tstep < tstop, "ngspice expects .tran TSTEP TSTOP, not TSTOP TSTEP"
+    assert tstop >= 2.0 / params.source_freq, (
+        "transient window must cover at least two source cycles"
+    )
