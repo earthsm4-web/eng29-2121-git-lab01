@@ -9,6 +9,7 @@ from bjt.format import fmt_i, fmt_num, fmt_r, fmt_v
 from bjt.steps import steps_for
 from bjt.validate import parse_form
 from bjt.spice_engine import SpiceParams, run_op, run_ac, run_tran
+from bjt.spice_metrics import ac_summary, tran_summary
 from bjt.spice_plot import plot_op_bars, plot_ac_response, plot_tran_waveforms
 
 DEFAULTS = {
@@ -175,6 +176,27 @@ def parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
     return values, {}
 
 
+def _ce_lab_dashboard(values, errors=None, analysis="op", spice_result=None,
+                      spice_error=None, ac_metrics=None, tran_metrics=None,
+                      *, plot_uri=None) -> str:
+    """Render the CE lab page with SPICE-only provenance.
+
+    ``plot_uri`` is computed in the route from the real parsed result (never in
+    Jinja) and is only rendered when ``spice_result`` is present.
+    """
+    return render_template(
+        "ce_lab.html",
+        values=values or {},
+        errors=errors or {},
+        analysis=analysis,
+        spice_result=spice_result,
+        spice_error=spice_error,
+        ac_metrics=ac_metrics,
+        tran_metrics=tran_metrics,
+        plot_uri=plot_uri,
+    )
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.add_template_filter(fmt_v, "v")
@@ -287,12 +309,73 @@ def create_app() -> Flask:
     def ce_lab():
         return _ce_lab_dashboard(values=CE_LAB_DEFAULTS, analysis="op")
 
-    def _ce_lab_dashboard(values=None, analysis="op") -> str:
-        """Render the CE lab dashboard skeleton."""
-        return render_template(
-            "ce_lab.html",
-            values=values,
+    @app.post("/ce-lab/run")
+    def ce_lab_run():
+        analysis = request.form.get("analysis", "op")
+        if analysis not in ("op", "ac", "tran"):
+            analysis = "op"
+
+        values, errors = parse_spice_form(request.form)
+        if errors:
+            return _ce_lab_dashboard(
+                values=request.form, errors=errors, analysis=analysis
+            ), 400
+
+        spice_params = SpiceParams(
+            vcc=values["vcc"],
+            rc=values["rc"],
+            r1=values["r1"],
+            r2=values["r2"],
+            re=values["re"],
+            rl=values["rl"],
+            beta=values["beta"],
+            vbe=values["vbe"],
+            source_ampl=values["source_ampl"],
+            source_freq=values["source_freq"],
+        )
+
+        spice_result = None
+        spice_error = None
+        ac_metrics = None
+        tran_metrics = None
+        plot_uri = None
+
+        try:
+            if analysis == "op":
+                spice_result = run_op(spice_params)
+                plot_uri = plot_op_bars(spice_result)
+            elif analysis == "ac":
+                spice_result = run_ac(spice_params)
+                ac_metrics = ac_summary(spice_result, values["source_freq"])
+                plot_uri = plot_ac_response(
+                    spice_result.frequency,
+                    spice_result.gain_db,
+                    spice_result.phase_deg,
+                )
+            else:
+                spice_result = run_tran(spice_params)
+                tran_metrics = tran_summary(spice_result, values["source_freq"])
+                plot_uri = plot_tran_waveforms(
+                    spice_result.time,
+                    spice_result.vin,
+                    spice_result.vout,
+                )
+        except Exception as exc:  # noqa: BLE001 -- surface engine/metric errors
+            spice_result = None
+            spice_error = str(exc)
+            ac_metrics = None
+            tran_metrics = None
+            plot_uri = None
+
+        return _ce_lab_dashboard(
+            values={k: str(v) for k, v in request.form.items()},
+            errors={},
             analysis=analysis,
+            spice_result=spice_result,
+            spice_error=spice_error,
+            ac_metrics=ac_metrics,
+            tran_metrics=tran_metrics,
+            plot_uri=plot_uri,
         )
 
     return app

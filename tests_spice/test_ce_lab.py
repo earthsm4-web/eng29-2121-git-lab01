@@ -266,3 +266,174 @@ def test_ce_lab_nav_links():
     assert 'href="/"' in html
     assert 'href="/spice"' in html
     assert 'href="/ce-lab"' in html
+
+
+# ---------------------------------------------------------------------------
+# POST dispatch + no-stale error rendering tests (Task 3)
+# ---------------------------------------------------------------------------
+
+import math
+import re
+
+import app as app_module
+from bjt.spice_engine import (
+    SpiceAcResult,
+    SpiceEngineError,
+    SpiceOpResult,
+    SpiceTranResult,
+)
+from bjt.spice_metrics import ac_summary, tran_summary
+
+
+CE_LAB_FORM = {
+    "vcc": "12", "rc": "2.2", "r1": "100", "r2": "22", "re": "1",
+    "rl": "10", "beta": "100", "vbe": "0.7",
+    "source_ampl": "0.010", "source_freq": "1000",
+}
+
+
+def _synthetic_op_result():
+    return SpiceOpResult(
+        vb=2.0, ve=1.3, vc=7.0, vce=5.7,
+        ic=0.0023, ib=0.000023, ie=0.002323,
+        region="active",
+        netlist="* synthetic op netlist",
+        run_log="synthetic op run log",
+    )
+
+
+def _synthetic_ac_result():
+    return SpiceAcResult(
+        frequency=[10.0, 100.0, 1000.0, 10000.0, 100000.0],
+        gain_db=[-20.0, 10.0, 20.0, 10.0, -20.0],
+        phase_deg=[170.0, 175.0, 180.0, 175.0, 170.0],
+        netlist="* synthetic ac netlist",
+        run_log="synthetic ac run log",
+    )
+
+
+def _synthetic_tran_result():
+    # 5 ms at 1000 Hz = five cycles; 101 samples.
+    time = [i * 0.00005 for i in range(101)]
+    vin = [0.01 * math.sin(2.0 * math.pi * 1000.0 * t) for t in time]
+    vout = [-1.0 * math.sin(2.0 * math.pi * 1000.0 * t) for t in time]
+    return SpiceTranResult(
+        time=time, vin=vin, vout=vout,
+        netlist="* synthetic tran netlist",
+        run_log="synthetic tran run log",
+    )
+
+
+def _patch_engine(monkeypatch, fakes):
+    """Patch every run_* so no test ever touches the real ngspice binary."""
+    calls = {"op": 0, "ac": 0, "tran": 0}
+    defaults = {
+        "op": lambda p: _synthetic_op_result(),
+        "ac": lambda p: _synthetic_ac_result(),
+        "tran": lambda p: _synthetic_tran_result(),
+    }
+
+    def wrap(name):
+        def run(p):
+            calls[name] += 1
+            return fakes.get(name, defaults[name])(p)
+        return run
+
+    monkeypatch.setattr(app_module, "run_op", wrap("op"))
+    monkeypatch.setattr(app_module, "run_ac", wrap("ac"))
+    monkeypatch.setattr(app_module, "run_tran", wrap("tran"))
+    return calls
+
+
+@pytest.mark.parametrize(
+    "analysis, expected_call",
+    [("op", "op"), ("ac", "ac"), ("tran", "tran")],
+)
+def test_ce_lab_run_dispatches_to_matching_engine(monkeypatch, analysis, expected_call):
+    """Each analysis calls exactly its own engine function and shows SPICE provenance."""
+    calls = _patch_engine(monkeypatch, {})
+
+    response = app_module.create_app().test_client().post(
+        "/ce-lab/run", data={**CE_LAB_FORM, "analysis": analysis}
+    )
+
+    assert response.status_code == 200
+    assert calls[expected_call] == 1
+    assert sum(calls.values()) == 1
+
+    html = response.data.decode()
+    assert "SPICE (ngspice)" in html
+    assert "SPICE SIMULATION RESULTS (NGSPICE)" in html.upper()
+    assert "DC Analytical" not in html
+    assert "dc_bias.py" not in html
+    assert re.search(r'<img[^>]+src="data:image/png;base64,', html)
+    assert ".model QNPN NPN(IS=1e-14 BF=" in html
+    assert "not instructor-verified" in html
+
+
+def test_ce_lab_run_ac_derives_metrics_from_real_arrays(monkeypatch):
+    """AC metrics on the page are derived from the parsed result arrays."""
+    _patch_engine(monkeypatch, {})
+    expected = ac_summary(_synthetic_ac_result(), 1000.0)
+
+    response = app_module.create_app().test_client().post(
+        "/ce-lab/run", data={**CE_LAB_FORM, "analysis": "ac"}
+    )
+
+    assert response.status_code == 200
+    html = response.data.decode()
+    assert f"{expected.gain_db_at_frequency:.2f}" in html
+    assert f"{expected.midband_gain_db:.2f}" in html
+
+
+def test_ce_lab_run_tran_derives_metrics_from_real_arrays(monkeypatch):
+    """Transient metrics on the page are derived from the parsed result arrays."""
+    _patch_engine(monkeypatch, {})
+    expected = tran_summary(_synthetic_tran_result(), 1000.0)
+
+    response = app_module.create_app().test_client().post(
+        "/ce-lab/run", data={**CE_LAB_FORM, "analysis": "tran"}
+    )
+
+    assert response.status_code == 200
+    html = response.data.decode()
+    assert f"{expected.vout_peak_to_peak_v:.3f}" in html
+    assert f"{expected.vin_peak_to_peak_v:.3f}" in html
+
+
+def test_ce_lab_run_engine_error_renders_log_without_stale_success(monkeypatch):
+    """A failing AC run renders the real engine log and no stale success state."""
+    def boom(_params):
+        raise SpiceEngineError("synthetic ngspice failure: log-token-XYZZY")
+
+    _patch_engine(monkeypatch, {"ac": boom})
+
+    response = app_module.create_app().test_client().post(
+        "/ce-lab/run", data={**CE_LAB_FORM, "analysis": "ac"}
+    )
+
+    assert response.status_code == 200
+    html = response.data.decode()
+    assert "log-token-XYZZY" in html
+    assert "SPICE SIMULATION RESULTS (NGSPICE)" not in html.upper()
+    assert "SPICE (ngspice)" not in html
+    assert not re.search(r'<img[^>]+src="data:image/png', html)
+    assert ".model QNPN" not in html
+
+
+def test_ce_lab_run_validation_error_returns_400_and_calls_no_engine(monkeypatch):
+    """Invalid input is rejected before any engine function is called."""
+    calls = _patch_engine(monkeypatch, {})
+
+    response = app_module.create_app().test_client().post(
+        "/ce-lab/run",
+        data={**CE_LAB_FORM, "analysis": "ac", "source_ampl": "0"},
+    )
+
+    assert response.status_code == 400
+    assert calls == {"op": 0, "ac": 0, "tran": 0}
+    html = response.data.decode()
+    assert "Source amplitude must be greater than 0.0" in html
+    assert "SPICE SIMULATION RESULTS (NGSPICE)" not in html.upper()
+    assert "SPICE (ngspice)" not in html
+    assert not re.search(r'<img[^>]+src="data:image/png', html)

@@ -2,25 +2,122 @@
 
 {% block content %}
   <h2>CE Amplifier Lab</h2>
-  <form method="get">
-    <input type="hidden" name="analysis" value="op">
-    <div class="form-group">
-      <label>VCC (V)</label>
-      <input name="vcc" type="number" step="any" value="{{ values.get('vcc', '') }}">
+
+  <section class="card">
+    <h2 class="card-title">Circuit &amp; Parameters (CE Voltage Divider v1)</h2>
+    <form method="post" action="{{ url_for('ce_lab_run') }}">
+      <div class="field">
+        <label for="analysis">Analysis Mode</label>
+        <select id="analysis" name="analysis">
+          <option value="op" {% if analysis == "op" %}selected{% endif %}>DC Operating Point (.op)</option>
+          <option value="ac" {% if analysis == "ac" %}selected{% endif %}>AC Analysis (.ac)</option>
+          <option value="tran" {% if analysis == "tran" %}selected{% endif %}>Transient Analysis (.tran)</option>
+        </select>
+      </div>
+
+      {% set ce_fields = [
+        ("vcc", "VCC", "V", "12"),
+        ("rc", "RC", "kΩ", "2.2"),
+        ("r1", "R1", "kΩ", "100"),
+        ("r2", "R2", "kΩ", "22"),
+        ("re", "RE", "kΩ", "1"),
+        ("rl", "RL", "kΩ", "10"),
+        ("beta", "Beta", "–", "100"),
+        ("vbe", "VBE", "V", "0.7"),
+        ("source_ampl", "Source amplitude", "V", "0.010"),
+        ("source_freq", "Source frequency", "Hz", "1000"),
+      ] %}
+      {% for name, label, unit, default in ce_fields %}
+      <div class="field">
+        <label for="{{ name }}">{{ label }} ({{ unit }})</label>
+        <input id="{{ name }}" name="{{ name }}" type="text" inputmode="decimal"
+               autocomplete="off" value="{{ values.get(name, default) }}">
+        {% if errors.get(name) %}
+        <p class="error">{{ errors[name] }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <button type="submit">Run Simulation</button>
+    </form>
+  </section>
+
+  {% if spice_error %}
+  <section class="card">
+    <h2 class="card-title">SPICE Engine Error</h2>
+    <div class="callout callout-cutoff">
+      <div>
+        <strong>ngspice run failed</strong>
+        <pre class="netlist-block" style="margin-top: 0.4rem;">{{ spice_error }}</pre>
+      </div>
     </div>
-    <div class="form-group">
-      <label>RC (kΩ)</label>
-      <input name="rc" type="number" step="any" value="{{ values.get('rc', '') }}">
-    </div>
-    <div class="form-group">
-      <label>Source amplitude (V)</label>
-      <input name="source_ampl" type="number" step="any" value="{{ values.get('source_ampl', '') }}">
-    </div>
-    <div class="form-group">
-      <label>Source frequency (Hz)</label>
-      <input name="source_freq" type="number" step="any" value="{{ values.get('source_freq', '') }}">
-    </div>
-    <button type="submit">Run Simulation</button>
-  </form>
-  {% if result is defined %}<div class="result">{{ result }}</div>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if spice_result %}
+  <section class="card">
+    <h2 class="card-title">
+      SPICE Simulation Results (ngspice)
+      <span class="provenance provenance-spice">SPICE (ngspice)</span>
+    </h2>
+
+    {% if plot_uri %}
+    <img class="spice-plot" src="{{ plot_uri }}" alt="Plot from real ngspice {{ analysis }} output">
+    {% endif %}
+
+    {% if analysis == "op" %}
+    <table class="results" style="margin-top: 0.5rem;">
+      <tbody>
+        <tr><th scope="row">VB</th><td>{{ "%.4f"|format(spice_result.vb) }} V</td></tr>
+        <tr><th scope="row">VE</th><td>{{ "%.4f"|format(spice_result.ve) }} V</td></tr>
+        <tr><th scope="row">VC</th><td>{{ "%.4f"|format(spice_result.vc) }} V</td></tr>
+        <tr><th scope="row">VCE</th><td>{{ "%.4f"|format(spice_result.vce) }} V</td></tr>
+        <tr><th scope="row">IC</th><td>{{ "%.4f"|format(spice_result.ic * 1e3) }} mA</td></tr>
+        <tr><th scope="row">IB</th><td>{{ "%.4f"|format(spice_result.ib * 1e6) }} µA</td></tr>
+        <tr><th scope="row">IE</th><td>{{ "%.4f"|format(spice_result.ie * 1e3) }} mA</td></tr>
+        <tr><th scope="row">Region</th><td>{{ spice_result.region }}</td></tr>
+      </tbody>
+    </table>
+    {% elif analysis == "ac" and ac_metrics %}
+    <table class="results" style="margin-top: 0.5rem;">
+      <tbody>
+        <tr><th scope="row">Gain at {{ "%.1f"|format(ac_metrics.gain_frequency_hz) }} Hz</th><td>{{ "%.2f"|format(ac_metrics.gain_db_at_frequency) }} dB</td></tr>
+        <tr><th scope="row">Midband gain</th><td>{{ "%.2f"|format(ac_metrics.midband_gain_db) }} dB</td></tr>
+        <tr><th scope="row">Phase at {{ "%.1f"|format(ac_metrics.gain_frequency_hz) }} Hz</th><td>{{ "%.2f"|format(ac_metrics.phase_deg_at_frequency) }} °</td></tr>
+        <tr><th scope="row">Low 3 dB cutoff</th><td>{% if ac_metrics.low_cutoff_hz is not none %}{{ "%.1f"|format(ac_metrics.low_cutoff_hz) }} Hz{% else %}not found{% endif %}</td></tr>
+        <tr><th scope="row">High 3 dB cutoff</th><td>{% if ac_metrics.high_cutoff_hz is not none %}{{ "%.1f"|format(ac_metrics.high_cutoff_hz) }} Hz{% else %}not found{% endif %}</td></tr>
+        <tr><th scope="row">Bandwidth</th><td>{% if ac_metrics.bandwidth_hz is not none %}{{ "%.1f"|format(ac_metrics.bandwidth_hz) }} Hz{% else %}not found{% endif %}</td></tr>
+        <tr><th scope="row">Note</th><td>{{ ac_metrics.cutoff_note }}</td></tr>
+      </tbody>
+    </table>
+    {% elif analysis == "tran" and tran_metrics %}
+    <table class="results" style="margin-top: 0.5rem;">
+      <tbody>
+        <tr><th scope="row">Analysis window start</th><td>{{ "%.3f"|format(tran_metrics.analysis_window_start_s * 1e3) }} ms</td></tr>
+        <tr><th scope="row">Last time</th><td>{{ "%.3f"|format(tran_metrics.time_s * 1e3) }} ms</td></tr>
+        <tr><th scope="row">Samples in window</th><td>{{ tran_metrics.sample_count }}</td></tr>
+        <tr><th scope="row">Vin peak-to-peak</th><td>{{ "%.3f"|format(tran_metrics.vin_peak_to_peak_v) }} V</td></tr>
+        <tr><th scope="row">Vout peak-to-peak</th><td>{{ "%.3f"|format(tran_metrics.vout_peak_to_peak_v) }} V</td></tr>
+      </tbody>
+    </table>
+    {% endif %}
+
+    <p class="section-label">Netlist (generated for this run)</p>
+    <pre class="netlist-block">{{ spice_result.netlist }}</pre>
+    <p class="model-note" style="font-size: 0.85rem; color: var(--muted);">
+      Simplified model line:
+      <code>.model QNPN NPN(IS=1e-14 BF={{ values.get('beta', 'beta') }})</code>
+      — simplified and not instructor-verified.
+    </p>
+
+    <details style="margin-top: 0.6rem;">
+      <summary style="cursor: pointer; font-weight: 600; color: var(--muted);">Run log (ngspice stdout)</summary>
+      <pre class="netlist-block" style="margin-top: 0.4rem;">{{ spice_result.run_log }}</pre>
+    </details>
+  </section>
+  {% endif %}
+
+  {% if not spice_result and not spice_error %}
+  <p class="placeholder">Configure parameters and click Run Simulation.</p>
+  {% endif %}
 {% endblock %}
