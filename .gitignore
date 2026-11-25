@@ -8,3 +8,29 @@ __pycache__/
 # Raw ngspice run logs are generated on every /spice run. Only the specific
 # evidence logs cited in docs/validation.md are tracked; ignore new ones.
 docs/captures/spice-*.txt
+
+# Local scratch / test-run artifacts (not part of any lab submission).
+test_output.txt
+/check_bounds.py
+/run_*.bat
+/run_*.py
+/verify_*.py
+/docs/superpowers/plans/*.md
+/docs/superpowers/specs/*.md
+
+# Local environment files and secrets — never commit these.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.secret
+*.token
+*id_rsa*
+*id_ed25519*
+secrets.*
+/secrets/

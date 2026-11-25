@@ -88,35 +88,35 @@
 
   <g fill="currentColor" stroke="none" font-family="system-ui, -apple-system, sans-serif">
     <!-- VCC label -->
-    <text id="s-vcc" x="140" y="52" font-size="13" font-weight="700">VCC {{ _vcc }} V</text>
+    <text id="s-vcc" x="140" y="52" font-size="13" font-weight="700">VCC {{ values.get("vcc", "") }} V</text>
 
     {% if mode == "divider" %}
     <text id="s-r1" class="schematic-mode mode-divider" x="240" y="128" text-anchor="end" font-size="12.5" font-weight="600">
-      R1 {{ _r1 }} kΩ
+      R1 {{ values.get("r1", "") }} kΩ
     </text>
     <text id="s-r2" class="schematic-mode mode-divider" x="200" y="288" text-anchor="end" font-size="12.5" font-weight="600">
-      R2 {{ _r2 }} kΩ
+      R2 {{ values.get("r2", "") }} kΩ
     </text>
     {% elif mode == "fixed" %}
     <text id="s-rb" class="schematic-mode mode-fixed" x="140" y="328" text-anchor="end" font-size="12.5" font-weight="600">
-      RB {{ _rb }} kΩ
+      RB {{ values.get("rb", "") }} kΩ
     </text>
     {% else %}
     <text id="s-rb" class="schematic-mode mode-emitter" x="140" y="328" text-anchor="end" font-size="12.5" font-weight="600">
-      RB {{ _rb }} kΩ
+      RB {{ values.get("rb", "") }} kΩ
     </text>
     <text id="s-re" class="schematic-mode mode-emitter schematic-mode mode-divider" x="280" y="308" text-anchor="end" font-size="12.5" font-weight="600">
-      RE {{ _re }} kΩ
+      RE {{ values.get("re", "") }} kΩ
     </text>
     {% endif %}
 
     <text id="s-rc" x="340" y="128" font-size="12.5" font-weight="600">
-      RC {{ _rc }} kΩ
+      RC {{ values.get("rc", "") }} kΩ
     </text>
 
     {% if mode != "fixed" %}
     <text id="s-re-right" class="schematic-mode mode-emitter schematic-mode mode-divider" x="340" y="308" font-size="12.5" font-weight="600">
-      RE {{ _re }} kΩ
+      RE {{ values.get("re", "") }} kΩ
     </text>
     {% endif %}
 
@@ -140,7 +140,15 @@
     <text x="330" y="200" font-size="13" font-weight="700">Q1</text>
     <text x="330" y="217" font-size="11" opacity="0.7">NPN</text>
     <text id="s-beta" x="330" y="232" font-size="11" opacity="0.7">
-      (β = {{ _beta }})
+      (β = {{ values.get("beta", "") }})
+    </text>
+
+    <!-- Computed Q-point -->
+    <text id="s-vce" x="350" y="342" font-size="11.5" font-weight="700" fill="#0f766e">
+      VCE {{ result.vce|v if result is defined and result else "-- V" }}
+    </text>
+    <text id="s-ic" x="350" y="358" font-size="11.5" font-weight="700" fill="#0f766e">
+      IC {{ result.ic|i if result is defined and result else "-- A" }}
     </text>
   </g>
 </svg>

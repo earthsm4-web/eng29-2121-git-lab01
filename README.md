@@ -123,6 +123,35 @@ crossing exists. Transient values use only samples after the first two source
 cycles. Engine, metric, and plot failures are labelled separately so a post-run
 bug is never reported as an ngspice failure.
 
+## Install and verify ngspice 47 (Lab 4)
+
+The SPICE adapter in `bjt/spice_engine.py` looks for
+`C:\tools\ngspice-47\Spice64\bin\ngspice_con.exe` first. If that exact file is
+missing, it falls back to `ngspice` or `ngspice_con` on `PATH`. If neither is
+found, the app reports an `ngspice binary not found` error instead of showing
+simulation results.
+
+1. Download the Windows 64-bit ngspice 47 build from the official
+   [ngspice download page](https://ngspice.sourceforge.io/download.html).
+2. Extract/install it, for example to `C:\tools\ngspice-47\Spice64\`, so the
+   executable is at `C:\tools\ngspice-47\Spice64\bin\ngspice_con.exe`.
+   Alternatively, add the folder containing `ngspice_con.exe` to your `PATH`.
+3. Verify the installed binary in PowerShell:
+
+   ```powershell
+   & 'C:\tools\ngspice-47\Spice64\bin\ngspice_con.exe' -v
+   ```
+
+   If it is on `PATH`, this also works:
+
+   ```powershell
+   ngspice_con.exe -v
+   ```
+
+   The banner should start with `** ngspice-47 : Circuit level simulation
+   program`. The validation record quotes the full banner, including the
+   `Aug 11 2026` creation date for the binary used in this lab.
+
 ## Run it
 
 ```powershell
@@ -163,7 +192,7 @@ bjt/spice_engine.py       ngspice adapter: .op / .ac / .tran
 bjt/spice_metrics.py      gain/phase/cutoff/transient metrics from SPICE data
 bjt/spice_plot.py         matplotlib plots from real SPICE data
 templates/base.html       dashboard shell with header
-templates/index.html      single-page DC dashboard (replaces form + result pages)
+templates/index.html      single-page DC dashboard with inline JS (replaces form + result pages)
 templates/_schematic.html inline-SVG circuit with computed node voltages
 templates/_steps.html     How this was calculated card
 templates/_comparison.html Approximate method check card
@@ -171,7 +200,6 @@ templates/spice.html      SPICE Sim page (real ngspice output)
 templates/ce_lab.html     CE Amplifier Lab 3-column page
 templates/_ce_circuit.html inline-SVG CE circuit (labels only)
 static/style.css          shared stylesheet + scoped CE-lab rules
-static/app.js             DC dashboard interactions
 static/ce_lab.js          CE-lab ARIA tab controller
 tests/                    original pytest suite (unmodified)
 tests_spice/              SPICE + CE-lab pytest suite

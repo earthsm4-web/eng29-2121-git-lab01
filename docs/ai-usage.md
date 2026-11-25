@@ -1,0 +1,4 @@
+- AI generated/edited the Flask routes, ngspice adapter, analysis/metrics/plot code, CE-lab templates, CSS/JS, regression tests, and most of the lab documentation.
+- I personally checked the real ngspice evidence: the `-v` banner, the saved `.op`/`.ac`/`.tran` logs, and that plotted/tabulated numbers match those logs instead of mock data.
+- I personally reviewed the Playwright browser screenshots and the recorded B1–B8 validation values, including the B1/B8 re-runs after the fixes.
+- AI did not fabricate screenshots or simulation results; the strict 3-column layout choice was mine, and no "before" screenshot was invented for the audit record.
