@@ -118,3 +118,137 @@
 3. `test_schematic_reports_the_saturation_qpoint` — same schematic variable issue
 4. `test_schematic_reports_the_cutoff_qpoint` — same schematic variable issue
 5. `test_index_renders_the_dashboard_with_defaults` — expects "Lab 02..." title; base.html is Lab 03/04
+
+---
+
+# CE Amplifier Lab (`/ce-lab`) — observed verification (2026-11-25)
+
+All numbers in this section were read from a real browser run on
+`http://127.0.0.1:5001/ce-lab` or from the exact commands shown. The transistor
+model in the generated netlist was `.model QNPN NPN(IS=1e-14 BF=100.0)` — a
+simplified, lab-local model, not an instructor-verified device card. No
+`dc_bias.py` value is compared anywhere on this page.
+
+## Engine smoke (real ngspice)
+
+Command:
+
+```
+.venv\Scripts\python -c "from bjt.spice_engine import SpiceParams,run_op,run_ac,run_tran; p=SpiceParams(vcc=12,rc=2200,r1=100000,r2=22000,re=1000,rl=10000,beta=100,vbe=0.7,source_ampl=0.01,source_freq=1000); print(len(run_op(p).run_log), len(run_ac(p).frequency), len(run_tran(p).time))"
+```
+
+Final output after the transient fix: `9802 61 1008`
+(run-log characters, AC frequency bins, transient samples). Before the fix the
+third number was `59`.
+
+## Browser acceptance — DC (`.op`)
+
+| Quantity | Observed value |
+|----------|----------------|
+| VB | 1.9363 V |
+| VE | 1.2751 V |
+| VC | 9.2225 V |
+| VCE | 7.9474 V |
+| IB | 12.6366 µA |
+| IC | 1.2637 mA |
+| IE | 1.2763 mA |
+| Region | active |
+
+Evidence: a rendered `img.spice-plot` with `alt="Plot from real ngspice op output"`
+(natural size 944×465), provenance heading `SPICE Simulation Results (ngspice)`,
+run-log section present, and the generated netlist visible on the page. The
+hidden `analysis` input read `op`; only the DC panel was visible.
+
+## Browser acceptance — AC (`.ac`)
+
+| Quantity | Observed value |
+|----------|----------------|
+| Gain at 1 kHz | 4.86 dB |
+| Midband max gain | 4.86 dB |
+| Phase at 1 kHz | −3.14 ° |
+| Closest frequency bin | 1000.0 Hz |
+| Low −3 dB cutoff | 1.9 Hz |
+| High −3 dB cutoff | not found |
+| Bandwidth | not found |
+| Cutoff Note | `low 3 dB cutoff at 1.9 Hz, high not found` |
+
+Evidence: `img.spice-plot` with `alt="Plot from real ngspice ac output"`
+(944×704). Clicking the AC tab changed the single hidden `analysis` input to
+`ac` and revealed only the AC panel; the run then produced the values above.
+No analytical comparison was shown.
+
+## Browser acceptance — Transient (`.tran`)
+
+| Quantity | Observed value |
+|----------|----------------|
+| Vin amplitude in analysis window | 0.020 V |
+| Vout amplitude in analysis window | 0.035 V |
+| Recorded duration | 5.000 ms |
+| Analysis window | 2.000 ms |
+| Samples in window | 601 |
+
+Evidence: `img.spice-plot` with `alt="Plot from real ngspice tran output"`,
+generated netlist directive `.tran 5e-06 0.005`, provenance heading
+`SPICE Simulation Results (ngspice)`, and no error callout.
+
+### Transient defect found and fixed during acceptance
+
+The first transient run failed with:
+
+```
+CE Lab Error
+Run could not be completed
+CE lab processing error after ngspice run: no data after analysis window (first two cycles extend beyond dataset)
+```
+
+Direct engine inspection showed the generated directive `.tran 0.005 5e-06` and
+`n=59`, `last=5e-06` — ngspice reads `.tran TSTEP TSTOP`, so the two arguments
+were reversed and the run stopped after 5 µs instead of 5 ms. The directive was
+corrected to `.tran {tstep} {tstop}` in `bjt/spice_engine.py`. After the fix the
+same command reported `first 0.0 last 0.005 n 1008`, and the browser run showed
+the values in the table above. A regression test
+`test_tran_netlist_uses_ngspice_tstep_tstop_order` was added: RED before the fix,
+GREEN after with `1 passed, 48 deselected in 0.56s`.
+
+This also explains the `59 points` transient record in the earlier 2026-11-24
+section above: that record came from the swapped directive and is superseded by
+the corrected 1008-sample run.
+
+## Invalid input — source amplitude `0`
+
+Browser submission with `Source amplitude = 0` returned HTTP 400 and showed:
+
+- field error: `Source amplitude must be greater than 0.0`
+- the rejected value `0` retained in the field
+- zero plot images, no provenance heading, no success heading
+- every cell in `#ce-dc-results`, `#ce-ac-results`, and `#ce-tran-results`
+  still showing `—`
+
+The only browser console error was the expected `400 (BAD REQUEST)` for that
+submission; no JavaScript errors were observed.
+
+## Responsive layout (observed bounding boxes)
+
+| Viewport | `grid-template-columns` | Column widths | Horizontal overflow |
+|----------|-------------------------|---------------|---------------------|
+| 1280 px | `410.703px 391.141px 391.156px` | 411 / 391 / 391 px, all on one row | none (`scrollWidth` 1265) |
+| 820 px | `776.219px` | 776 px, stacked | none |
+| 390 px | stacked single column | 346 px | none |
+
+Screenshots: `docs/captures/ce-lab-1280.png`, `docs/captures/ce-lab-820.png`,
+`docs/captures/ce-lab-390.png`.
+
+## Test suite
+
+Final command and result after all CE Lab changes and the transient fix:
+
+```
+.venv\Scripts\python -m pytest -q
+5 failed, 98 passed in 2.00s
+```
+
+An immediately preceding identical run reported `5 failed, 98 passed in 2.09s`.
+
+The five failures are the same pre-existing `tests/test_routes.py` assertion
+failures listed above; `tests/*` was not modified. All `tests_spice` tests pass.
+Observed Python/pytest during this run: Python 3.13.2, pytest 9.2.0.
