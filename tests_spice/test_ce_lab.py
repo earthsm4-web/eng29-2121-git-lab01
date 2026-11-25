@@ -43,6 +43,22 @@ def test_ac_summary_bandwidth_none_when_no_crossing():
     assert "not found" in summary.cutoff_note
 
 
+def test_ac_summary_gain_frequency_hz_returns_real_bin():
+    # Target 950.0 Hz is not exactly in the array [1.0, 10.0, 100.0, 1000.0, ...]
+    # The closest bin is 1000.0 (index 3), so gain_frequency_hz must be 1000.0
+    result = SpiceAcResult(
+        frequency=[1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0],
+        gain_db=[-40.0, -10.0, 20.0, 20.0, -10.0, -40.0],
+        phase_deg=[170.0, 175.0, 180.0, 180.0, 175.0, 170.0],
+        netlist="",
+        run_log="",
+    )
+    summary = ac_summary(result, 950.0)
+    assert summary.gain_frequency_hz == 1000.0
+    assert summary.gain_db_at_frequency == 20.0
+    assert summary.phase_deg_at_frequency == 180.0
+
+
 # ---------------------------------------------------------------------------
 # tran_summary tests
 # ---------------------------------------------------------------------------

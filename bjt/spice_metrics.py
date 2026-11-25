@@ -133,9 +133,12 @@ def ac_summary(result: SpiceAcResult, target_freq_hz: float) -> AcSummary:
         high_crossing_hz = None
         bandwidth = None
 
+    # Return the REAL frequency bin closest to target, not the target itself
+    real_freq_at_target = freq[target_idx]
+
     return AcSummary(
         gain_db_at_frequency=gain_at_target,
-        gain_frequency_hz=target_freq_hz,
+        gain_frequency_hz=real_freq_at_target,
         midband_gain_db=midband,
         phase_deg_at_frequency=phase_at_target,
         low_cutoff_hz=low_crossing_hz,
@@ -149,8 +152,8 @@ def tran_summary(result: SpiceTranResult, source_freq_hz: float) -> TranSummary:
     """Derive transient summary metrics from :class:`SpiceTranResult`.
 
     Ignores the first two complete cycles of the source waveform.
-    Raises ``ValueError`` if ``source_freq_hz`` is zero or the result has
-    insufficient data after the analysis window.
+    Raises ``ValueError`` if ``source_freq_hz`` is zero, arrays are empty,
+    arrays have mismatched lengths, or no data remains after the analysis window.
     """
     if source_freq_hz == 0:
         raise ValueError("source_freq_hz must be non-zero")
@@ -159,15 +162,28 @@ def tran_summary(result: SpiceTranResult, source_freq_hz: float) -> TranSummary:
     vin = result.vin
     vout = result.vout
 
+    # --- validation: non-empty and matched lengths ---
+    if not time:
+        raise ValueError("time array is empty")
+    if not vin:
+        raise ValueError("vin array is empty")
+    if not vout:
+        raise ValueError("vout array is empty")
+    if len(time) != len(vin) or len(time) != len(vout):
+        raise ValueError("arrays have mismatched lengths")
+
     period = 1.0 / source_freq_hz
     window_start = 2.0 * period  # skip first two cycles
 
     # Find first index with time >= window_start
-    start_idx = 0
+    start_idx: int | None = None
     for i, t in enumerate(time):
         if t >= window_start:
             start_idx = i
             break
+
+    if start_idx is None:
+        raise ValueError("no data after analysis window (first two cycles extend beyond dataset)")
 
     window_time = time[start_idx:]
     window_vin = vin[start_idx:]
