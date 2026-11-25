@@ -19,14 +19,7 @@
       </figure>
 
       <form method="post" action="{{ url_for('ce_lab_run') }}">
-        <div class="field">
-          <label for="analysis">Analysis Mode</label>
-          <select id="analysis" name="analysis">
-            <option value="op" {% if analysis == "op" %}selected{% endif %}>DC Operating Point (.op)</option>
-            <option value="ac" {% if analysis == "ac" %}selected{% endif %}>AC Analysis (.ac)</option>
-            <option value="tran" {% if analysis == "tran" %}selected{% endif %}>Transient Analysis (.tran)</option>
-          </select>
-        </div>
+        <input type="hidden" id="analysis" name="analysis" value="{{ analysis }}">
 
         {% set ce_fields = [
           ("vcc", "VCC", "V", "12"),
@@ -65,14 +58,15 @@
       <h2 class="card-title" id="ce-workbench-title">Analysis Workbench</h2>
       {% endif %}
 
-      <div class="ce-lab-tabs">
-        <button type="button" class="ce-lab-tab" data-analysis="op">DC Analysis</button>
-        <button type="button" class="ce-lab-tab" data-analysis="ac">AC Analysis</button>
-        <button type="button" class="ce-lab-tab" data-analysis="tran">Transient Analysis</button>
+      <div class="ce-lab-tabs" role="tablist" aria-label="Analysis modes">
+        <button type="button" class="ce-lab-tab" id="ce-tab-op" data-analysis="op" role="tab" aria-controls="ce-panel-op" aria-selected="{{ 'true' if analysis == 'op' else 'false' }}" tabindex="{{ 0 if analysis == 'op' else -1 }}">DC Analysis</button>
+        <button type="button" class="ce-lab-tab" id="ce-tab-ac" data-analysis="ac" role="tab" aria-controls="ce-panel-ac" aria-selected="{{ 'true' if analysis == 'ac' else 'false' }}" tabindex="{{ 0 if analysis == 'ac' else -1 }}">AC Analysis</button>
+        <button type="button" class="ce-lab-tab" id="ce-tab-tran" data-analysis="tran" role="tab" aria-controls="ce-panel-tran" aria-selected="{{ 'true' if analysis == 'tran' else 'false' }}" tabindex="{{ 0 if analysis == 'tran' else -1 }}">Transient Analysis</button>
       </div>
+      <p class="ce-lab-tab-hint">Choose an analysis, then click Run Simulation.</p>
 
       <div class="ce-lab-panels">
-        <div class="ce-lab-panel" id="ce-panel-op" data-analysis="op">
+        <div class="ce-lab-panel" id="ce-panel-op" data-analysis="op" role="tabpanel" aria-labelledby="ce-tab-op"{% if analysis != "op" %} hidden{% endif %}>
           <h3>DC Analysis</h3>
           {% if analysis == "op" and spice_result %}
             {% if plot_uri %}
@@ -84,7 +78,7 @@
           {% endif %}
         </div>
 
-        <div class="ce-lab-panel" id="ce-panel-ac" data-analysis="ac">
+        <div class="ce-lab-panel" id="ce-panel-ac" data-analysis="ac" role="tabpanel" aria-labelledby="ce-tab-ac"{% if analysis != "ac" %} hidden{% endif %}>
           <h3>AC Analysis</h3>
           {% if analysis == "ac" and spice_result %}
             {% if plot_uri %}
@@ -96,7 +90,7 @@
           {% endif %}
         </div>
 
-        <div class="ce-lab-panel" id="ce-panel-tran" data-analysis="tran">
+        <div class="ce-lab-panel" id="ce-panel-tran" data-analysis="tran" role="tabpanel" aria-labelledby="ce-tab-tran"{% if analysis != "tran" %} hidden{% endif %}>
           <h3>Transient Analysis</h3>
           {% if analysis == "tran" and spice_result %}
             {% if plot_uri %}
@@ -112,15 +106,15 @@
       {% if spice_result %}
       <p class="section-label">Netlist (generated for this run)</p>
       <pre class="netlist-block">{{ spice_result.netlist }}</pre>
-      <p class="model-note" style="font-size: 0.85rem; color: var(--muted);">
+      <p class="ce-model-note">
         Simplified model line:
         <code>.model QNPN NPN(IS=1e-14 BF={{ values.get('beta', 'beta') }})</code>
         — simplified and not instructor-verified.
       </p>
 
-      <details style="margin-top: 0.6rem;">
-        <summary style="cursor: pointer; font-weight: 600; color: var(--muted);">Run log (ngspice stdout)</summary>
-        <pre class="netlist-block" style="margin-top: 0.4rem;">{{ spice_result.run_log }}</pre>
+      <details class="ce-details">
+        <summary class="ce-details-summary">Run log (ngspice stdout)</summary>
+        <pre class="netlist-block ce-run-log">{{ spice_result.run_log }}</pre>
       </details>
       {% endif %}
     </section>
@@ -183,7 +177,7 @@
     <div class="callout callout-cutoff">
       <div>
         <strong>Run could not be completed</strong>
-        <pre class="netlist-block" style="margin-top: 0.4rem;">{{ spice_error }}</pre>
+        <pre class="netlist-block ce-error-log">{{ spice_error }}</pre>
       </div>
     </div>
   </section>
@@ -192,4 +186,6 @@
   {% if not spice_result and not spice_error and not errors %}
   <p class="placeholder">Configure parameters and click Run Simulation.</p>
   {% endif %}
+
+  <script src="{{ url_for('static', filename='ce_lab.js') }}"></script>
 {% endblock %}

@@ -643,3 +643,141 @@ table.compare tbody tr:nth-child(even) {
 .spice-plot { width: 100%; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); }
 .section-label { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 0.8rem 0 0.3rem; }
 @media (max-width: 1100px) { .dashboard { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   Lab 4 Task 5 — Accessible CE lab tabs, scoped styling, responsive motion
+   Scoped additions only. Shared tokens and rules above are left untouched.
+   ========================================================================== */
+
+.ce-lab-grid {
+  --ce-navy: #10233a;
+  --ce-navy-soft: #e8eef6;
+  --ce-navy-line: #c3d2e0;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.ce-lab-column {
+  min-width: 0;
+}
+
+.ce-lab-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ce-lab-tab {
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ce-lab-tab:hover {
+  color: var(--ce-navy);
+  border-color: var(--ce-navy-line);
+}
+
+.ce-lab-tab:focus-visible {
+  outline: 3px solid rgba(16, 35, 58, 0.35);
+  outline-offset: 2px;
+}
+
+.ce-lab-tab[aria-selected="true"] {
+  color: #fff;
+  background: var(--ce-navy);
+  border-color: var(--ce-navy);
+}
+
+.ce-lab-tab-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ce-lab-panel {
+  padding: 0.9rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.ce-lab-panel h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ce-lab-result {
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  background: var(--ce-navy-soft);
+  border: 1px solid var(--ce-navy-line);
+  border-radius: 10px;
+}
+
+.ce-lab-grid .unit-chip {
+  min-width: 2.6rem;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  background: var(--ce-navy-soft);
+  border-color: var(--ce-navy-line);
+  color: var(--ce-navy);
+}
+
+@keyframes ceFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ce-lab-panel:not([hidden]) {
+  animation: ceFade 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ce-lab-panel:not([hidden]) { animation: none; }
+}
+
+.ce-model-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ce-details {
+  margin-top: 0.6rem;
+}
+
+.ce-details-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ce-run-log { margin-top: 0.4rem; }
+.ce-error-log { margin-top: 0.4rem; }
+
+@media (max-width: 1100px) {
+  .ce-lab-grid { grid-template-columns: 1fr 1fr; }
+  .ce-lab-results-column { grid-column: 1 / -1; }
+}
+
+@media (max-width: 860px) {
+  .ce-lab-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .ce-lab-grid { gap: 0.7rem; }
+  .ce-lab-tabs { gap: 0.35rem; }
+  .ce-lab-tab { padding: 0.4rem 0.75rem; font-size: 0.82rem; }
+}

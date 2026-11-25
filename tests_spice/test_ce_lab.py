@@ -593,3 +593,86 @@ def test_ce_lab_schematic_analysis_field_is_not_duplicated():
     html = _ce_lab_get_html()
 
     assert html.count('name="analysis"') == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 5: Accessible tabs, scoped styling, and responsive motion
+# ---------------------------------------------------------------------------
+
+def test_ce_lab_tabs_render_aria_tablist_tabpanel_markup():
+    """GET /ce-lab renders an ARIA tablist, three tabs/panels, hint, and script."""
+    html = _ce_lab_get_html()
+
+    assert 'role="tablist"' in html
+    assert html.count('role="tab"') == 3
+    assert html.count('role="tabpanel"') == 3
+    assert 'aria-label="Analysis modes"' in html
+
+    for tab_id, panel_id, analysis in (
+        ("ce-tab-op", "ce-panel-op", "op"),
+        ("ce-tab-ac", "ce-panel-ac", "ac"),
+        ("ce-tab-tran", "ce-panel-tran", "tran"),
+    ):
+        assert f'id="{tab_id}"' in html, f"tab {tab_id} missing"
+        assert f'id="{panel_id}"' in html, f"panel {panel_id} missing"
+        assert f'aria-controls="{panel_id}"' in html, f"aria-controls {panel_id} missing"
+        assert f'aria-labelledby="{tab_id}"' in html, f"aria-labelledby {tab_id} missing"
+        assert f'data-analysis="{analysis}"' in html, f"data-analysis {analysis} missing"
+
+    # Exactly one tab is selected (the default DC tab) and panels must not
+    # carry inline styles once the scoped classes land.
+    assert html.count('aria-selected="true"') == 1
+    assert 'aria-selected="false"' in html
+    assert "Choose an analysis, then click Run Simulation." in html
+    assert '/static/ce_lab.js' in html
+    assert 'style=' not in html
+
+
+def test_ce_lab_tabs_hidden_analysis_field_is_single_hidden_input():
+    """The visible <select> is now one hidden input named analysis."""
+    html = _ce_lab_get_html()
+
+    assert html.count('name="analysis"') == 1
+    assert '<input type="hidden" id="analysis" name="analysis"' in html
+    assert '<select' not in html
+
+
+def test_ce_lab_tabs_scoped_stylesheet_has_required_ce_lab_rules():
+    """static/style.css carries the scoped CE-lab tokens, tabs, and breakpoints."""
+    from pathlib import Path
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "style.css"
+    assert css_path.exists()
+    css = css_path.read_text(encoding="utf-8")
+
+    required_tokens = [
+        ".ce-lab-grid",
+        "--ce-navy",
+        "@media (max-width: 1100px)",
+        "@media (max-width: 860px)",
+        "@media (max-width: 560px)",
+        "prefers-reduced-motion",
+        "ceFade",
+        ".ce-lab-tabs",
+        ".ce-lab-tab",
+        ".ce-lab-panel",
+        ".ce-lab-result",
+        ".unit-chip",
+    ]
+    for token in required_tokens:
+        assert token in css, f"static/style.css missing required CE-lab token: {token}"
+
+
+def test_ce_lab_tabs_javascript_controller_source():
+    """static/ce_lab.js wires the ARIA tabs without auto-submitting the form."""
+    from pathlib import Path
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "ce_lab.js"
+    assert js_path.exists(), "static/ce_lab.js must exist for the CE lab tab controller"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "ArrowLeft" in js
+    assert "ArrowRight" in js
+    assert "form.submit" not in js
+    assert "addEventListener" in js
+    assert "DOMContentLoaded" in js or "readyState" in js
