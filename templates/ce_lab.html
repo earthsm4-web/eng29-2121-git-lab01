@@ -3,44 +3,179 @@
 {% block content %}
   <h2>CE Amplifier Lab</h2>
 
-  <section class="card">
-    <h2 class="card-title">Circuit &amp; Parameters (CE Voltage Divider v1)</h2>
-    <form method="post" action="{{ url_for('ce_lab_run') }}">
-      <div class="field">
-        <label for="analysis">Analysis Mode</label>
-        <select id="analysis" name="analysis">
-          <option value="op" {% if analysis == "op" %}selected{% endif %}>DC Operating Point (.op)</option>
-          <option value="ac" {% if analysis == "ac" %}selected{% endif %}>AC Analysis (.ac)</option>
-          <option value="tran" {% if analysis == "tran" %}selected{% endif %}>Transient Analysis (.tran)</option>
-        </select>
+  {% if spice_result and analysis == "op" %}
+    {% set op_result = spice_result %}
+  {% else %}
+    {% set op_result = none %}
+  {% endif %}
+
+  <div class="ce-lab-grid">
+    <section class="card ce-lab-column ce-lab-input-column" aria-labelledby="ce-input-title">
+      <h2 class="card-title" id="ce-input-title">Circuit &amp; Parameters (CE Voltage Divider v1)</h2>
+
+      <figure class="ce-lab-schematic">
+        {% include "_ce_circuit.html" %}
+        <figcaption>Voltage-divider biased common-emitter amplifier. Component labels only; measured values appear in the result panels.</figcaption>
+      </figure>
+
+      <form method="post" action="{{ url_for('ce_lab_run') }}">
+        <div class="field">
+          <label for="analysis">Analysis Mode</label>
+          <select id="analysis" name="analysis">
+            <option value="op" {% if analysis == "op" %}selected{% endif %}>DC Operating Point (.op)</option>
+            <option value="ac" {% if analysis == "ac" %}selected{% endif %}>AC Analysis (.ac)</option>
+            <option value="tran" {% if analysis == "tran" %}selected{% endif %}>Transient Analysis (.tran)</option>
+          </select>
+        </div>
+
+        {% set ce_fields = [
+          ("vcc", "VCC", "V", "12"),
+          ("rc", "RC", "kΩ", "2.2"),
+          ("r1", "R1", "kΩ", "100"),
+          ("r2", "R2", "kΩ", "22"),
+          ("re", "RE", "kΩ", "1"),
+          ("rl", "RL", "kΩ", "10"),
+          ("beta", "Beta", "–", "100"),
+          ("vbe", "VBE", "V", "0.7"),
+          ("source_ampl", "Source amplitude", "V", "0.010"),
+          ("source_freq", "Source frequency", "Hz", "1000"),
+        ] %}
+        {% for name, label, unit, default in ce_fields %}
+        <div class="field">
+          <label for="{{ name }}">{{ label }} ({{ unit }})</label>
+          <input id="{{ name }}" name="{{ name }}" type="text" inputmode="decimal"
+                 autocomplete="off" value="{{ values.get(name, default) }}">
+          {% if errors.get(name) %}
+          <p class="error">{{ errors[name] }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <button type="submit">Run Simulation</button>
+      </form>
+    </section>
+
+    <section class="card ce-lab-column ce-lab-workbench" aria-labelledby="ce-workbench-title">
+      {% if spice_result %}
+      <h2 class="card-title" id="ce-workbench-title">
+        SPICE Simulation Results (ngspice)
+        <span class="provenance provenance-spice">SPICE (ngspice)</span>
+      </h2>
+      {% else %}
+      <h2 class="card-title" id="ce-workbench-title">Analysis Workbench</h2>
+      {% endif %}
+
+      <div class="ce-lab-tabs">
+        <button type="button" class="ce-lab-tab" data-analysis="op">DC Analysis</button>
+        <button type="button" class="ce-lab-tab" data-analysis="ac">AC Analysis</button>
+        <button type="button" class="ce-lab-tab" data-analysis="tran">Transient Analysis</button>
       </div>
 
-      {% set ce_fields = [
-        ("vcc", "VCC", "V", "12"),
-        ("rc", "RC", "kΩ", "2.2"),
-        ("r1", "R1", "kΩ", "100"),
-        ("r2", "R2", "kΩ", "22"),
-        ("re", "RE", "kΩ", "1"),
-        ("rl", "RL", "kΩ", "10"),
-        ("beta", "Beta", "–", "100"),
-        ("vbe", "VBE", "V", "0.7"),
-        ("source_ampl", "Source amplitude", "V", "0.010"),
-        ("source_freq", "Source frequency", "Hz", "1000"),
-      ] %}
-      {% for name, label, unit, default in ce_fields %}
-      <div class="field">
-        <label for="{{ name }}">{{ label }} ({{ unit }})</label>
-        <input id="{{ name }}" name="{{ name }}" type="text" inputmode="decimal"
-               autocomplete="off" value="{{ values.get(name, default) }}">
-        {% if errors.get(name) %}
-        <p class="error">{{ errors[name] }}</p>
-        {% endif %}
-      </div>
-      {% endfor %}
+      <div class="ce-lab-panels">
+        <div class="ce-lab-panel" id="ce-panel-op" data-analysis="op">
+          <h3>DC Analysis</h3>
+          {% if analysis == "op" and spice_result %}
+            {% if plot_uri %}
+            <img class="spice-plot" src="{{ plot_uri }}" alt="Plot from real ngspice op output">
+            {% endif %}
+            <p class="section-label">Real ngspice .op output for this run.</p>
+          {% else %}
+            <p class="placeholder">No DC operating-point run on this page load. Select DC Analysis and run the simulation.</p>
+          {% endif %}
+        </div>
 
-      <button type="submit">Run Simulation</button>
-    </form>
-  </section>
+        <div class="ce-lab-panel" id="ce-panel-ac" data-analysis="ac">
+          <h3>AC Analysis</h3>
+          {% if analysis == "ac" and spice_result %}
+            {% if plot_uri %}
+            <img class="spice-plot" src="{{ plot_uri }}" alt="Plot from real ngspice ac output">
+            {% endif %}
+            <p class="section-label">Real ngspice .ac output for this run.</p>
+          {% else %}
+            <p class="placeholder">No AC sweep on this page load. Select AC Analysis and run the simulation.</p>
+          {% endif %}
+        </div>
+
+        <div class="ce-lab-panel" id="ce-panel-tran" data-analysis="tran">
+          <h3>Transient Analysis</h3>
+          {% if analysis == "tran" and spice_result %}
+            {% if plot_uri %}
+            <img class="spice-plot" src="{{ plot_uri }}" alt="Plot from real ngspice tran output">
+            {% endif %}
+            <p class="section-label">Real ngspice .tran output for this run.</p>
+          {% else %}
+            <p class="placeholder">No transient run on this page load. Select Transient Analysis and run the simulation.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if spice_result %}
+      <p class="section-label">Netlist (generated for this run)</p>
+      <pre class="netlist-block">{{ spice_result.netlist }}</pre>
+      <p class="model-note" style="font-size: 0.85rem; color: var(--muted);">
+        Simplified model line:
+        <code>.model QNPN NPN(IS=1e-14 BF={{ values.get('beta', 'beta') }})</code>
+        — simplified and not instructor-verified.
+      </p>
+
+      <details style="margin-top: 0.6rem;">
+        <summary style="cursor: pointer; font-weight: 600; color: var(--muted);">Run log (ngspice stdout)</summary>
+        <pre class="netlist-block" style="margin-top: 0.4rem;">{{ spice_result.run_log }}</pre>
+      </details>
+      {% endif %}
+    </section>
+
+    <section class="card ce-lab-column ce-lab-results-column" aria-labelledby="ce-results-title">
+      <h2 class="card-title" id="ce-results-title">Engineering Results</h2>
+
+      <section class="ce-lab-result" id="ce-dc-results" aria-labelledby="ce-dc-results-title">
+        <h3 id="ce-dc-results-title">DC Operating Point</h3>
+        <table class="results">
+          <tbody>
+            <tr><th scope="row">VB</th><td>{% if op_result %}{{ "%.4f"|format(op_result.vb) }} V{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">VE</th><td>{% if op_result %}{{ "%.4f"|format(op_result.ve) }} V{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">VC</th><td>{% if op_result %}{{ "%.4f"|format(op_result.vc) }} V{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">VCE</th><td>{% if op_result %}{{ "%.4f"|format(op_result.vce) }} V{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">IB</th><td>{% if op_result %}{{ "%.4f"|format(op_result.ib * 1e6) }} µA{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">IC</th><td>{% if op_result %}{{ "%.4f"|format(op_result.ic * 1e3) }} mA{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">IE</th><td>{% if op_result %}{{ "%.4f"|format(op_result.ie * 1e3) }} mA{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Region</th><td>{% if op_result %}{{ op_result.region }}{% else %}—{% endif %}</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="ce-lab-result" id="ce-ac-results" aria-labelledby="ce-ac-results-title">
+        <h3 id="ce-ac-results-title">AC Frequency Response</h3>
+        <table class="results">
+          <tbody>
+            <tr><th scope="row">Voltage Gain</th><td>{% if ac_metrics %}{{ "%.2f"|format(ac_metrics.gain_db_at_frequency) }} dB{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Midband Gain</th><td>{% if ac_metrics %}{{ "%.2f"|format(ac_metrics.midband_gain_db) }} dB{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Phase</th><td>{% if ac_metrics %}{{ "%.2f"|format(ac_metrics.phase_deg_at_frequency) }} °{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Frequency</th><td>{% if ac_metrics %}{{ "%.1f"|format(ac_metrics.gain_frequency_hz) }} Hz{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Low Cutoff</th><td>{% if ac_metrics and ac_metrics.low_cutoff_hz is not none %}{{ "%.1f"|format(ac_metrics.low_cutoff_hz) }} Hz{% elif ac_metrics %}not found{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">High Cutoff</th><td>{% if ac_metrics and ac_metrics.high_cutoff_hz is not none %}{{ "%.1f"|format(ac_metrics.high_cutoff_hz) }} Hz{% elif ac_metrics %}not found{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Bandwidth</th><td>{% if ac_metrics and ac_metrics.bandwidth_hz is not none %}{{ "%.1f"|format(ac_metrics.bandwidth_hz) }} Hz{% elif ac_metrics %}not found{% else %}—{% endif %}</td></tr>
+            {% if ac_metrics and ac_metrics.bandwidth_hz is none %}
+            <tr><th scope="row">Cutoff Note</th><td>{{ ac_metrics.cutoff_note }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="ce-lab-result" id="ce-tran-results" aria-labelledby="ce-tran-results-title">
+        <h3 id="ce-tran-results-title">Transient Response</h3>
+        <table class="results">
+          <tbody>
+            <tr><th scope="row">Vin peak-to-peak</th><td>{% if tran_metrics %}{{ "%.3f"|format(tran_metrics.vin_peak_to_peak_v) }} V{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Vout peak-to-peak</th><td>{% if tran_metrics %}{{ "%.3f"|format(tran_metrics.vout_peak_to_peak_v) }} V{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Time</th><td>{% if tran_metrics %}{{ "%.3f"|format(tran_metrics.time_s * 1e3) }} ms{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Window Start</th><td>{% if tran_metrics %}{{ "%.3f"|format(tran_metrics.analysis_window_start_s * 1e3) }} ms{% else %}—{% endif %}</td></tr>
+            <tr><th scope="row">Samples</th><td>{% if tran_metrics %}{{ tran_metrics.sample_count }}{% else %}—{% endif %}</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </div>
 
   {% if spice_error %}
   <section class="card">
@@ -54,70 +189,7 @@
   </section>
   {% endif %}
 
-  {% if spice_result %}
-  <section class="card">
-    <h2 class="card-title">
-      SPICE Simulation Results (ngspice)
-      <span class="provenance provenance-spice">SPICE (ngspice)</span>
-    </h2>
-
-    {% if plot_uri %}
-    <img class="spice-plot" src="{{ plot_uri }}" alt="Plot from real ngspice {{ analysis }} output">
-    {% endif %}
-
-    {% if analysis == "op" %}
-    <table class="results" style="margin-top: 0.5rem;">
-      <tbody>
-        <tr><th scope="row">VB</th><td>{{ "%.4f"|format(spice_result.vb) }} V</td></tr>
-        <tr><th scope="row">VE</th><td>{{ "%.4f"|format(spice_result.ve) }} V</td></tr>
-        <tr><th scope="row">VC</th><td>{{ "%.4f"|format(spice_result.vc) }} V</td></tr>
-        <tr><th scope="row">VCE</th><td>{{ "%.4f"|format(spice_result.vce) }} V</td></tr>
-        <tr><th scope="row">IC</th><td>{{ "%.4f"|format(spice_result.ic * 1e3) }} mA</td></tr>
-        <tr><th scope="row">IB</th><td>{{ "%.4f"|format(spice_result.ib * 1e6) }} µA</td></tr>
-        <tr><th scope="row">IE</th><td>{{ "%.4f"|format(spice_result.ie * 1e3) }} mA</td></tr>
-        <tr><th scope="row">Region</th><td>{{ spice_result.region }}</td></tr>
-      </tbody>
-    </table>
-    {% elif analysis == "ac" and ac_metrics %}
-    <table class="results" style="margin-top: 0.5rem;">
-      <tbody>
-        <tr><th scope="row">Gain at {{ "%.1f"|format(ac_metrics.gain_frequency_hz) }} Hz</th><td>{{ "%.2f"|format(ac_metrics.gain_db_at_frequency) }} dB</td></tr>
-        <tr><th scope="row">Midband gain</th><td>{{ "%.2f"|format(ac_metrics.midband_gain_db) }} dB</td></tr>
-        <tr><th scope="row">Phase at {{ "%.1f"|format(ac_metrics.gain_frequency_hz) }} Hz</th><td>{{ "%.2f"|format(ac_metrics.phase_deg_at_frequency) }} °</td></tr>
-        <tr><th scope="row">Low 3 dB cutoff</th><td>{% if ac_metrics.low_cutoff_hz is not none %}{{ "%.1f"|format(ac_metrics.low_cutoff_hz) }} Hz{% else %}not found{% endif %}</td></tr>
-        <tr><th scope="row">High 3 dB cutoff</th><td>{% if ac_metrics.high_cutoff_hz is not none %}{{ "%.1f"|format(ac_metrics.high_cutoff_hz) }} Hz{% else %}not found{% endif %}</td></tr>
-        <tr><th scope="row">Bandwidth</th><td>{% if ac_metrics.bandwidth_hz is not none %}{{ "%.1f"|format(ac_metrics.bandwidth_hz) }} Hz{% else %}not found{% endif %}</td></tr>
-        <tr><th scope="row">Note</th><td>{{ ac_metrics.cutoff_note }}</td></tr>
-      </tbody>
-    </table>
-    {% elif analysis == "tran" and tran_metrics %}
-    <table class="results" style="margin-top: 0.5rem;">
-      <tbody>
-        <tr><th scope="row">Analysis window start</th><td>{{ "%.3f"|format(tran_metrics.analysis_window_start_s * 1e3) }} ms</td></tr>
-        <tr><th scope="row">Last time</th><td>{{ "%.3f"|format(tran_metrics.time_s * 1e3) }} ms</td></tr>
-        <tr><th scope="row">Samples in window</th><td>{{ tran_metrics.sample_count }}</td></tr>
-        <tr><th scope="row">Vin peak-to-peak</th><td>{{ "%.3f"|format(tran_metrics.vin_peak_to_peak_v) }} V</td></tr>
-        <tr><th scope="row">Vout peak-to-peak</th><td>{{ "%.3f"|format(tran_metrics.vout_peak_to_peak_v) }} V</td></tr>
-      </tbody>
-    </table>
-    {% endif %}
-
-    <p class="section-label">Netlist (generated for this run)</p>
-    <pre class="netlist-block">{{ spice_result.netlist }}</pre>
-    <p class="model-note" style="font-size: 0.85rem; color: var(--muted);">
-      Simplified model line:
-      <code>.model QNPN NPN(IS=1e-14 BF={{ values.get('beta', 'beta') }})</code>
-      — simplified and not instructor-verified.
-    </p>
-
-    <details style="margin-top: 0.6rem;">
-      <summary style="cursor: pointer; font-weight: 600; color: var(--muted);">Run log (ngspice stdout)</summary>
-      <pre class="netlist-block" style="margin-top: 0.4rem;">{{ spice_result.run_log }}</pre>
-    </details>
-  </section>
-  {% endif %}
-
-  {% if not spice_result and not spice_error %}
+  {% if not spice_result and not spice_error and not errors %}
   <p class="placeholder">Configure parameters and click Run Simulation.</p>
   {% endif %}
 {% endblock %}

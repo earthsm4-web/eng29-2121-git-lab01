@@ -1,0 +1,84 @@
+<svg class="ce-circuit-svg" viewBox="0 0 400 440" role="img"
+     aria-labelledby="ce-circuit-title ce-circuit-desc">
+  <title id="ce-circuit-title">Common-emitter amplifier with voltage-divider bias</title>
+  <desc id="ce-circuit-desc">NPN common-emitter amplifier with voltage-divider bias. VCC feeds R1 and RC. R1 and R2 set the base bias of Q1. The collector drives Cout and the load RL. RE returns the emitter to GND. Vin couples through Cin to the base.</desc>
+
+  <defs>
+    <marker id="ce-bjt-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <g stroke="currentColor" stroke-width="2" fill="none"
+     stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- Supply rail -->
+    <line x1="90" y1="60" x2="340" y2="60"/>
+
+    <!-- Base divider: R1 from VCC to base node, R2 from base node to ground -->
+    <line x1="110" y1="60" x2="110" y2="90"/>
+    <rect x="100" y="90" width="20" height="50" rx="2"/>
+    <line x1="110" y1="140" x2="110" y2="200"/>
+    <circle cx="110" cy="200" r="3" fill="currentColor"/>
+    <line x1="110" y1="200" x2="110" y2="250"/>
+    <rect x="100" y="250" width="20" height="50" rx="2"/>
+    <line x1="110" y1="300" x2="110" y2="380"/>
+
+    <!-- Input coupling: Vin through Cin to the base -->
+    <circle cx="30" cy="200" r="4"/>
+    <line x1="34" y1="200" x2="66" y2="200"/>
+    <line x1="70" y1="186" x2="70" y2="214"/>
+    <line x1="78" y1="186" x2="78" y2="214"/>
+    <line x1="78" y1="200" x2="110" y2="200"/>
+    <line x1="110" y1="200" x2="200" y2="200"/>
+
+    <!-- Q1 base bar -->
+    <line x1="200" y1="178" x2="200" y2="222"/>
+
+    <!-- Collector: Q1 to RC and the output node -->
+    <line x1="200" y1="186" x2="240" y2="166"/>
+    <line x1="240" y1="166" x2="240" y2="150"/>
+    <rect x="230" y="100" width="20" height="50" rx="2"/>
+    <line x1="240" y1="100" x2="240" y2="60"/>
+    <circle cx="240" cy="166" r="3" fill="currentColor"/>
+
+    <!-- Emitter: Q1 through RE to ground -->
+    <line x1="200" y1="214" x2="240" y2="234" marker-end="url(#ce-bjt-arrow)"/>
+    <line x1="240" y1="236" x2="240" y2="250"/>
+    <rect x="230" y="250" width="20" height="50" rx="2"/>
+    <line x1="240" y1="300" x2="240" y2="380"/>
+
+    <!-- Output coupling: collector through Cout to RL -->
+    <line x1="240" y1="166" x2="270" y2="166"/>
+    <line x1="274" y1="152" x2="274" y2="180"/>
+    <line x1="282" y1="152" x2="282" y2="180"/>
+    <line x1="282" y1="166" x2="350" y2="166"/>
+    <circle cx="310" cy="166" r="3" fill="currentColor"/>
+    <line x1="350" y1="166" x2="350" y2="220"/>
+    <rect x="340" y="220" width="20" height="50" rx="2"/>
+    <line x1="350" y1="270" x2="350" y2="380"/>
+
+    <!-- Ground rail and symbol -->
+    <line x1="110" y1="380" x2="350" y2="380"/>
+    <line x1="230" y1="380" x2="230" y2="392"/>
+    <line x1="216" y1="392" x2="244" y2="392"/>
+    <line x1="221" y1="398" x2="239" y2="398"/>
+    <line x1="226" y1="404" x2="234" y2="404"/>
+  </g>
+
+  <g fill="currentColor" stroke="none" font-size="13" font-family="inherit">
+    <text x="215" y="44" text-anchor="middle">VCC</text>
+    <text x="88" y="122" text-anchor="end">R1</text>
+    <text x="88" y="282" text-anchor="end">R2</text>
+    <text x="262" y="128">RC</text>
+    <text x="262" y="282">RE</text>
+    <text x="368" y="246">RL</text>
+    <text x="188" y="168" text-anchor="end">Q1</text>
+    <text x="188" y="184" text-anchor="end">NPN</text>
+    <text x="30" y="178" text-anchor="middle">Vin</text>
+    <text x="74" y="234" text-anchor="middle">Cin</text>
+    <text x="278" y="200" text-anchor="middle">Cout</text>
+    <text x="230" y="424" text-anchor="middle">GND</text>
+  </g>
+</svg>

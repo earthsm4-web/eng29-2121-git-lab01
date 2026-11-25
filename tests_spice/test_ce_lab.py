@@ -461,3 +461,102 @@ def test_ce_lab_run_validation_error_returns_400_and_calls_no_engine(monkeypatch
     assert "SPICE SIMULATION RESULTS (NGSPICE)" not in html.upper()
     assert "SPICE (ngspice)" not in html
     assert not re.search(r'<img[^>]+src="data:image/png', html)
+
+
+# ---------------------------------------------------------------------------
+# Task 4: schematic, parameter labels, and engineering result panels
+# ---------------------------------------------------------------------------
+
+
+def _ce_lab_get_html():
+    return app_module.create_app().test_client().get("/ce-lab").data.decode()
+
+
+def _ce_svg_block(html):
+    match = re.search(
+        r'<svg[^>]*aria-labelledby="ce-circuit-title ce-circuit-desc".*?</svg>',
+        html,
+        re.DOTALL,
+    )
+    assert match, "accessible CE circuit SVG with aria-labelledby not found"
+    return match.group(0)
+
+
+def _ce_result_section(html, section_id):
+    match = re.search(
+        rf'<section[^>]*id="{section_id}".*?</section>',
+        html,
+        re.DOTALL,
+    )
+    assert match, f"engineering result section #{section_id} not found"
+    return match.group(0)
+
+
+def test_ce_lab_schematic_has_all_components_and_no_fabricated_values():
+    html = _ce_lab_get_html()
+    svg = _ce_svg_block(html)
+
+    assert (
+        '<title id="ce-circuit-title">'
+        "Common-emitter amplifier with voltage-divider bias"
+        "</title>" in svg
+    )
+    assert re.search(r"<desc[^>]*>.+</desc>", svg, re.DOTALL)
+    assert 'role="img"' in svg.split(">", 1)[0]
+
+    for label in (
+        "Q1", "NPN", "R1", "R2", "RC", "RE",
+        "Cin", "Cout", "RL", "VCC", "Vin", "GND",
+    ):
+        assert re.search(rf">\s*{re.escape(label)}\s*<", svg), (
+            f"component label {label!r} missing from schematic"
+        )
+
+    # No numeric voltage/current annotations may be drawn in the schematic.
+    assert not re.search(r"\d+(?:\.\d+)?\s*(?:mV|µA|uA|mA|V|A)\b", svg)
+
+
+def test_ce_lab_schematic_form_labels_have_units():
+    html = _ce_lab_get_html()
+
+    for label in (
+        "VCC (V)",
+        "RC (kΩ)",
+        "R1 (kΩ)",
+        "R2 (kΩ)",
+        "RE (kΩ)",
+        "RL (kΩ)",
+        "Source amplitude (V)",
+        "Source frequency (Hz)",
+    ):
+        assert label in html, f"parameter label/unit {label!r} missing"
+
+
+def test_ce_lab_schematic_engineering_panel_names():
+    html = _ce_lab_get_html()
+
+    dc = _ce_result_section(html, "ce-dc-results")
+    for name in ("VB", "VE", "VC", "VCE", "IB", "IC", "IE"):
+        assert f">{name}<" in dc, f"DC quantity {name!r} missing"
+
+    ac = _ce_result_section(html, "ce-ac-results")
+    for name in ("Voltage Gain", "Phase", "Frequency", "Cutoff", "Bandwidth"):
+        assert name in ac, f"AC quantity {name!r} missing"
+
+    tran = _ce_result_section(html, "ce-tran-results")
+    for name in ("Vin", "Vout", "Time"):
+        assert name in tran, f"transient quantity {name!r} missing"
+
+
+def test_ce_lab_schematic_result_placeholders_on_get():
+    html = _ce_lab_get_html()
+
+    for section_id in ("ce-dc-results", "ce-ac-results", "ce-tran-results"):
+        section = _ce_result_section(html, section_id)
+        assert "—" in section, f"no placeholder in #{section_id}"
+
+
+def test_ce_lab_schematic_analysis_field_is_not_duplicated():
+    html = _ce_lab_get_html()
+
+    assert html.count('name="analysis"') == 1
