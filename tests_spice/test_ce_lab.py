@@ -492,6 +492,26 @@ def _ce_result_section(html, section_id):
     return match.group(0)
 
 
+def _ce_table_cells(section):
+    """Return every result cell's text, unescaped and stripped."""
+    from html import unescape
+
+    return [
+        unescape(cell).strip()
+        for cell in re.findall(r"<td[^>]*>(.*?)</td>", section, re.DOTALL)
+    ]
+
+
+def _ce_svg_texts(svg):
+    """Return the set of visible <text> labels drawn in the schematic."""
+    from html import unescape
+
+    return {
+        unescape(text).strip()
+        for text in re.findall(r"<text[^>]*>(.*?)</text>", svg, re.DOTALL)
+    }
+
+
 def test_ce_lab_schematic_has_all_components_and_no_fabricated_values():
     html = _ce_lab_get_html()
     svg = _ce_svg_block(html)
@@ -511,6 +531,13 @@ def test_ce_lab_schematic_has_all_components_and_no_fabricated_values():
         assert re.search(rf">\s*{re.escape(label)}\s*<", svg), (
             f"component label {label!r} missing from schematic"
         )
+
+    # Only the allowed component labels may be drawn: no numeric or other
+    # annotation can hide in a bare <text> element.
+    assert _ce_svg_texts(svg) == {
+        "Q1", "NPN", "R1", "R2", "RC", "RE",
+        "Cin", "Cout", "RL", "VCC", "Vin", "GND",
+    }, f"unexpected schematic text labels: {_ce_svg_texts(svg)}"
 
     # No numeric voltage/current annotations may be drawn in the schematic.
     assert not re.search(r"\d+(?:\.\d+)?\s*(?:mV|µA|uA|mA|V|A)\b", svg)
@@ -553,7 +580,13 @@ def test_ce_lab_schematic_result_placeholders_on_get():
 
     for section_id in ("ce-dc-results", "ce-ac-results", "ce-tran-results"):
         section = _ce_result_section(html, section_id)
-        assert "—" in section, f"no placeholder in #{section_id}"
+        cells = _ce_table_cells(section)
+        assert cells, f"no result cells in #{section_id}"
+        for cell in cells:
+            assert cell == "—", (
+                f"fabricated value in #{section_id}: {cell!r}; "
+                "every GET result cell must be —"
+            )
 
 
 def test_ce_lab_schematic_analysis_field_is_not_duplicated():
