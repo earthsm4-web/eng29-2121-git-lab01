@@ -149,9 +149,17 @@ def parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
         if not math.isfinite(value):
             errors[field] = f"{label} must be a number"
             continue
-        if lo is not None and value <= lo:
-            errors[field] = f"{label} must be greater than {lo}"
-            continue
+        if lo is not None:
+            # Inclusive lower bound for beta (≥1), vbe (0.1–2.0), source_freq (1–1MHz);
+            # strict lower bound (>0) for vcc/rc/r1/re/rl/source_ampl
+            if field in ("beta", "vbe", "source_freq"):
+                if value < lo:
+                    errors[field] = f"{label} must be greater than or equal to {lo}"
+                    continue
+            else:
+                if value <= lo:
+                    errors[field] = f"{label} must be greater than {lo}"
+                    continue
         if hi is not None and value > hi:
             errors[field] = f"{label} must be less than or equal to {hi}"
             continue
@@ -165,11 +173,6 @@ def parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
         values[field] *= 1000.0
 
     return values, {}
-
-
-def _parse_spice_form(form) -> tuple[dict[str, float] | None, dict[str, str]]:
-    """Delegate to module-level parse_spice_form."""
-    return parse_spice_form(form)
 
 
 def create_app() -> Flask:
@@ -282,14 +285,13 @@ def create_app() -> Flask:
 
     @app.get("/ce-lab")
     def ce_lab():
-        values, _ = parse_spice_form(CE_LAB_DEFAULTS)
-        return _ce_lab_dashboard(values=values, analysis="op")
+        return _ce_lab_dashboard(values=CE_LAB_DEFAULTS, analysis="op")
 
     def _ce_lab_dashboard(values=None, analysis="op") -> str:
         """Render the CE lab dashboard skeleton."""
         return render_template(
             "ce_lab.html",
-            values=values or CE_LAB_DEFAULTS,
+            values=values,
             analysis=analysis,
         )
 
