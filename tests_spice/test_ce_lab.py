@@ -415,8 +415,32 @@ def test_ce_lab_run_engine_error_renders_log_without_stale_success(monkeypatch):
     assert response.status_code == 200
     html = response.data.decode()
     assert "log-token-XYZZY" in html
+    assert "ngspice run failed" in html
     assert "SPICE SIMULATION RESULTS (NGSPICE)" not in html.upper()
     assert "SPICE (ngspice)" not in html
+    assert not re.search(r'<img[^>]+src="data:image/png', html)
+    assert ".model QNPN" not in html
+
+
+def test_ce_lab_run_processing_error_does_not_blame_engine(monkeypatch):
+    """A metric/plot failure after a good run is labeled as processing, not engine."""
+    _patch_engine(monkeypatch, {})
+
+    def boom_metrics(_result, _source_freq):
+        raise RuntimeError("metric derivation exploded: metric-token-ABC")
+
+    monkeypatch.setattr(app_module, "ac_summary", boom_metrics)
+
+    response = app_module.create_app().test_client().post(
+        "/ce-lab/run", data={**CE_LAB_FORM, "analysis": "ac"}
+    )
+
+    assert response.status_code == 200
+    html = response.data.decode()
+    assert "CE lab processing error after ngspice run: metric derivation exploded: metric-token-ABC" in html
+    assert "ngspice run failed" not in html
+    assert "SPICE (ngspice)" not in html
+    assert "SPICE SIMULATION RESULTS (NGSPICE)" not in html.upper()
     assert not re.search(r'<img[^>]+src="data:image/png', html)
     assert ".model QNPN" not in html
 

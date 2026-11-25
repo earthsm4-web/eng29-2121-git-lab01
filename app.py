@@ -8,7 +8,7 @@ from bjt.bias import Region, compare, solve, solve_bias
 from bjt.format import fmt_i, fmt_num, fmt_r, fmt_v
 from bjt.steps import steps_for
 from bjt.validate import parse_form
-from bjt.spice_engine import SpiceParams, run_op, run_ac, run_tran
+from bjt.spice_engine import SpiceEngineError, SpiceParams, run_op, run_ac, run_tran
 from bjt.spice_metrics import ac_summary, tran_summary
 from bjt.spice_plot import plot_op_bars, plot_ac_response, plot_tran_waveforms
 
@@ -343,26 +343,38 @@ def create_app() -> Flask:
         try:
             if analysis == "op":
                 spice_result = run_op(spice_params)
-                plot_uri = plot_op_bars(spice_result)
             elif analysis == "ac":
                 spice_result = run_ac(spice_params)
-                ac_metrics = ac_summary(spice_result, values["source_freq"])
-                plot_uri = plot_ac_response(
-                    spice_result.frequency,
-                    spice_result.gain_db,
-                    spice_result.phase_deg,
-                )
             else:
                 spice_result = run_tran(spice_params)
-                tran_metrics = tran_summary(spice_result, values["source_freq"])
-                plot_uri = plot_tran_waveforms(
-                    spice_result.time,
-                    spice_result.vin,
-                    spice_result.vout,
-                )
-        except Exception as exc:  # noqa: BLE001 -- surface engine/metric errors
-            spice_result = None
-            spice_error = str(exc)
+        except SpiceEngineError as exc:
+            spice_error = f"ngspice run failed: {exc}"
+        except Exception as exc:  # noqa: BLE001 -- unexpected engine dispatch error
+            spice_error = f"CE lab run error: {exc}"
+
+        if spice_result is not None:
+            try:
+                if analysis == "op":
+                    plot_uri = plot_op_bars(spice_result)
+                elif analysis == "ac":
+                    ac_metrics = ac_summary(spice_result, values["source_freq"])
+                    plot_uri = plot_ac_response(
+                        spice_result.frequency,
+                        spice_result.gain_db,
+                        spice_result.phase_deg,
+                    )
+                else:
+                    tran_metrics = tran_summary(spice_result, values["source_freq"])
+                    plot_uri = plot_tran_waveforms(
+                        spice_result.time,
+                        spice_result.vin,
+                        spice_result.vout,
+                    )
+            except Exception as exc:  # noqa: BLE001 -- metric/plot post-processing
+                spice_result = None
+                spice_error = f"CE lab processing error after ngspice run: {exc}"
+
+        if spice_result is None:
             ac_metrics = None
             tran_metrics = None
             plot_uri = None
